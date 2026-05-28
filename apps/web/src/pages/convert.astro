@@ -1,21 +1,44 @@
 ---
 import BaseLayout from '~/layouts/BaseLayout.astro';
+import StepperRail from '~/islands/StepperRail.tsx';
+import SourcePicker from '~/islands/SourcePicker.tsx';
+import PlatformBadge from '~/islands/PlatformBadge.tsx';
+import GapDashboard from '~/islands/GapDashboard.tsx';
+import FieldCard from '~/islands/FieldCard.tsx';
+import ExportBar from '~/islands/ExportBar.tsx';
+import ConvertOrchestrator from '~/islands/ConvertOrchestrator.tsx';
+
+const FIELDS = ['name', 'description', 'personality', 'scenario', 'first_mes', 'mes_example'];
 ---
 <BaseLayout title="Convert">
-  <div id="convert-root" class="grid grid-cols-[200px_1fr] gap-6">
-    <aside class="text-sm text-slate-500">
-      <!-- StepperRail island mounts here in PR-3 -->
-      <ol class="space-y-2">
-        <li>① Source</li><li>② Gap</li><li>③ Convert</li>
-        <li>④ Edit + AI</li><li>⑤ Export</li>
-      </ol>
-    </aside>
-    <section class="space-y-12">
-      <section id="step-source"><h2>① Source</h2><p>Coming in PR-3.</p></section>
-      <section id="step-gap"><h2>② Gap</h2></section>
-      <section id="step-convert"><h2>③ Convert</h2></section>
-      <section id="step-edit"><h2>④ Edit + AI</h2></section>
-      <section id="step-export"><h2>⑤ Export</h2></section>
+  <ConvertOrchestrator client:load />
+  <div class="grid grid-cols-[160px_1fr] gap-8">
+    <aside><StepperRail client:load /></aside>
+    <section class="space-y-12 pb-24">
+      <section id="step-source" class="space-y-3">
+        <h2 class="text-xl font-semibold">① Source</h2>
+        <SourcePicker client:load />
+        <PlatformBadge client:load />
+      </section>
+      <section id="step-gap" class="space-y-3">
+        <h2 class="text-xl font-semibold">② Gap</h2>
+        <GapDashboard client:load />
+      </section>
+      <section id="step-convert" class="space-y-3">
+        <h2 class="text-xl font-semibold">③ Converted</h2>
+        <p class="text-sm text-slate-500">Auto-fills as soon as source + target are picked.</p>
+      </section>
+      <section id="step-edit" class="space-y-3">
+        <h2 class="text-xl font-semibold">④ Edit</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+          {FIELDS.map((f) => <FieldCard client:load field={f} />)}
+        </div>
+      </section>
+      <section id="step-export" class="space-y-3">
+        <h2 class="text-xl font-semibold">⑤ Export</h2>
+        <p class="text-sm text-slate-500">Use the bar below.</p>
+      </section>
     </section>
   </div>
+  <ExportBar client:load />
 </BaseLayout>
