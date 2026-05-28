@@ -6,7 +6,8 @@ dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.27",
   "pydantic>=2.6",
-  "chara-convert @ file:///D:/projects/aichat_group/chara-convert",
+  "typing-extensions>=4.10",
+  "chara-convert @ file:../../chara-convert",
 ]
 
 [project.optional-dependencies]

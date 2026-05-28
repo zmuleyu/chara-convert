@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import Literal, TypedDict
+from typing import Literal
 
 from fastapi import APIRouter
+from typing_extensions import TypedDict
 
 from chara_convert.registry import list_platforms, load_spec
 from chara_convert.sources.auto import CAIParser, ChaiParser, PolyBuzzParser
