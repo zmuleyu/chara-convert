@@ -1,0 +1,31 @@
+name: api-ci
+on:
+  push:
+    paths:
+      - 'apps/api/**'
+      - 'chara-convert/**'
+      - '.github/workflows/api-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'chara-convert/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e ./chara-convert -e ./apps/api[dev]
+      - name: apps/api contract tests
+        run: pytest -q
+        working-directory: apps/api
+      - name: chara-convert suite (must stay green)
+        run: pytest -q
+        working-directory: chara-convert
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f apps/api/Dockerfile -t chara-convert-shim:ci .

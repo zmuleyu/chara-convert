@@ -1,0 +1,58 @@
+name: web-ci
+on:
+  push:
+    paths:
+      - 'apps/web/**'
+      - 'apps/api/**'
+      - 'chara-convert/**'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/api/**'
+      - 'chara-convert/**'
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install Python deps (chara-convert + apps/api shim)
+        run: |
+          pip install -e ./chara-convert
+          pip install -e ./apps/api
+      - name: Install Node deps
+        working-directory: apps/web
+        run: npm ci
+      - name: Type check
+        working-directory: apps/web
+        run: npm run typecheck
+      - name: Vitest
+        working-directory: apps/web
+        run: npm test
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
+      - name: Playwright browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: E2E
+        working-directory: apps/web
+        run: npm run test:e2e
+      - name: Upload Playwright trace + report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
