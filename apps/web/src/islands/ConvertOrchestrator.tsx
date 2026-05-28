@@ -13,7 +13,7 @@ export default function ConvertOrchestrator() {
     let cancelled = false;
     api.convert({ card: sourceCard, targetSlug })
       .then((r) => { if (!cancelled) { setConverted(r.converted); setGap(r.gap); } })
-      .catch(() => { /* surfaced by future error island */ });
+      .catch((e) => { if (!cancelled) console.error('[ConvertOrchestrator] /api/convert failed:', e); });
     return () => { cancelled = true; };
   }, [sourceCard, targetSlug, setConverted, setGap]);
 
