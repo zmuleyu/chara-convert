@@ -1,0 +1,23 @@
+---
+import '~/styles/globals.css';
+interface Props { title: string }
+const { title } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title} · chara-convert</title>
+  </head>
+  <body class="min-h-screen bg-white text-slate-900">
+    <header class="border-b px-6 py-3 flex gap-6">
+      <a href={base}>chara-convert</a>
+      <a href={`${base}convert`}>Convert</a>
+      <a href={`${base}pricing`}>Pricing</a>
+      <a href={`${base}docs`}>Docs</a>
+    </header>
+    <main class="px-6 py-8"><slot /></main>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro';
+---
+<BaseLayout title="Convert">
+  <div id="convert-root" class="grid grid-cols-[200px_1fr] gap-6">
+    <aside class="text-sm text-slate-500">
+      <!-- StepperRail island mounts here in PR-3 -->
+      <ol class="space-y-2">
+        <li>① Source</li><li>② Gap</li><li>③ Convert</li>
+        <li>④ Edit + AI</li><li>⑤ Export</li>
+      </ol>
+    </aside>
+    <section class="space-y-12">
+      <section id="step-source"><h2>① Source</h2><p>Coming in PR-3.</p></section>
+      <section id="step-gap"><h2>② Gap</h2></section>
+      <section id="step-convert"><h2>③ Convert</h2></section>
+      <section id="step-edit"><h2>④ Edit + AI</h2></section>
+      <section id="step-export"><h2>⑤ Export</h2></section>
+    </section>
+  </div>
+</BaseLayout>
