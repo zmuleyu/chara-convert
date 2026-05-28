@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.astro/
+playwright-report/
+test-results/
+.env
+.env.local
+.env.*.local
+coverage/
+.vercel/

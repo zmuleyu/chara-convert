@@ -1,0 +1,16 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import HeroDemo from '~/islands/HeroDemo.tsx';
+const base = import.meta.env.BASE_URL;
+---
+<BaseLayout title="Move your character anywhere">
+  <h1 class="text-4xl font-bold">Move your character card. Anywhere.</h1>
+  <p class="mt-4 text-lg text-slate-600 max-w-2xl">
+    Drag a CAI / Chai / Tavern card in. Get a ready-to-use card for
+    FictionLab, NovelAI, RisuAI, Agnai, Backyard, JanitorAI, Nomi, or Saucepan.
+  </p>
+  <div class="mt-8 flex gap-4">
+    <a href={`${base}convert`} class="px-6 py-3 bg-slate-900 text-white rounded">Try it now</a>
+    <HeroDemo client:visible />
+  </div>
+</BaseLayout>

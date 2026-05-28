@@ -7,6 +7,15 @@ precedence the CLI uses (see :mod:`chara_convert.llm.factory`).
 
 from __future__ import annotations
 
+import warnings as _warnings
+
+_warnings.warn(
+    "chara_convert.webui is deprecated; use studio.aichathub.uk/chara-convert/ "
+    "(scheduled for removal in PR-5 of the UX redesign — 2026-Q3).",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 import tempfile
 from pathlib import Path
 from typing import Any
