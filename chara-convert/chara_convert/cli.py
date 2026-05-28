@@ -7,11 +7,26 @@ from pathlib import Path
 
 import click
 
+from chara_convert.ai import enrich_layered
 from chara_convert.converter import convert
 from chara_convert.diff import analyze
 from chara_convert.exporters.markdown import render_markdown
+from chara_convert.llm import LLMClient
+from chara_convert.llm.factory import build_ai_client_or_none
 from chara_convert.parser import parse_file
 from chara_convert.registry import list_platforms, load_spec
+
+
+def _build_ai_client() -> LLMClient:
+    """CLI wrapper around :func:`build_ai_client_or_none` that surfaces a
+    Click usage error when no backend env is set."""
+    client, _status = build_ai_client_or_none()
+    if client is None:
+        raise click.UsageError(
+            "--ai requested but no AI backend configured. "
+            "Set ANTHROPIC_API_KEY (real) or CHARA_CONVERT_AI_MOCK (canned response) and retry."
+        )
+    return client
 
 
 @click.group()
@@ -25,7 +40,13 @@ def main() -> None:
 @click.argument("source", type=click.Path(exists=True, path_type=Path))
 @click.option("--target", "-t", required=True, help="Target platform slug")
 @click.option("--out", "-o", type=click.Path(path_type=Path), help="Output markdown file")
-def convert_cmd(source: Path, target: str, out: Path | None) -> None:
+@click.option(
+    "--ai/--no-ai",
+    default=False,
+    help="Use AI to fill missing layered fields (example dialogue, scenario intro). "
+    "Requires ANTHROPIC_API_KEY or CHARA_CONVERT_AI_MOCK env var.",
+)
+def convert_cmd(source: Path, target: str, out: Path | None, ai: bool) -> None:
     """Convert a character card and produce a gap analysis report."""
     try:
         spec = load_spec(target)
@@ -40,8 +61,11 @@ def convert_cmd(source: Path, target: str, out: Path | None) -> None:
         click.echo(f"Parse error: {e}", err=True)
         sys.exit(1)
 
+    ai_client = _build_ai_client() if ai else None
     gap = analyze(card, spec)
     converted = convert(card, spec)
+    if ai_client is not None:
+        enrich_layered(converted, card, client=ai_client)
     md = render_markdown(converted, gap)
 
     if out:

@@ -1,0 +1,34 @@
+# chara-convert LLM proxy Worker.
+# Ported from aichathub fed7839 src/lib/llm-proxy.ts (Astro APIRoute → Worker fetch).
+# Handoff: aichathub claude/modest-payne-9719b2-H30Ej collab/handoffs/2026-05-28-proxy-worker-migration.md
+
+name = "chara-convert-llm-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-28"
+compatibility_flags = ["nodejs_compat"]
+
+# KV namespace IDs preserved from aichathub wrangler.toml.
+# Account 24f44c02c89ded60aa44ae1f9491642f (zmuleyu@gmail.com). Cross-account
+# deploys: create a new namespace with `wrangler kv:namespace create RATE_LIMIT_KV`
+# (and `--preview`) and replace both IDs below.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "b240216870df41b5998eb183822757ee"
+preview_id = "251c98eaa1f940f5a416460c0d74650a"
+
+[vars]
+# ADJUST: list every Origin that chara-convert frontends (CLI users, Gradio webui,
+# CI smoke runs) will present. Anything outside this list gets 403 origin_not_allowed.
+ALLOWED_ORIGINS = "https://aichathub.uk,https://nsfw.aichathub.uk,http://localhost:4321,http://localhost:7860"
+RATE_LIMIT_PER_MIN = "20"
+COST_CEILING_DAILY = "10000"
+# Upstream Messages endpoint. Temporarily pointed at OpenRouter's Anthropic
+# Messages-compatible endpoint (Bearer auth). Restore to
+# https://api.anthropic.com/v1/messages when a real Anthropic key is in use,
+# and revert the Authorization header in src/llm-proxy.ts back to x-api-key
+# (see TODO(provider-abstraction)).
+ANTHROPIC_API_URL = "https://openrouter.ai/api/v1/messages"
+ANTHROPIC_API_VERSION = "2023-06-01"
+
+# Secret (NOT in repo): wrangler secret put ANTHROPIC_API_KEY
+# When upstream is OpenRouter, set the OpenRouter key here.

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .converter import _fictionlab_field_value
 from .normalizer import NormalizedCard
 from .registry import PlatformSpec
 
@@ -59,8 +60,40 @@ def _detect_dialogue_format(text: str) -> str:
     return "Plain"
 
 
+def _analyze_layered(card: NormalizedCard, target: PlatformSpec) -> GapReport:
+    """Gap analysis for layered targets (FictionLab). Fields are reported as
+    ``"<layer>.<field>"``; flat-only metrics (lorebook / greeting / dialogue
+    format) are left at their defaults — those don't apply to layered output."""
+    assert target.layers is not None  # caller-checked
+    report = GapReport(target_slug=target.slug, target_name=target.name)
+
+    total = 0
+    filled = 0
+    for lname, layer in target.layers.items():
+        for fname, fspec in layer.fields.items():
+            total += 1
+            key = f"{lname}.{fname}"
+            value = _fictionlab_field_value(card, lname, fname)
+            if value:
+                report.perfect_match.append(key)
+                filled += 1
+            elif fspec.required:
+                report.missing.append(key)
+
+    report.ready_score = int((filled / total) * 100) if total else 0
+    if report.missing:
+        report.notes.append(
+            f"{len(report.missing)} required layered field(s) need manual input: "
+            f"{', '.join(report.missing)}"
+        )
+    return report
+
+
 def analyze(card: NormalizedCard, target: PlatformSpec) -> GapReport:
     """Produce a GapReport for converting *card* to *target* platform."""
+    if target.layers is not None:
+        return _analyze_layered(card, target)
+
     report = GapReport(
         target_slug=target.slug,
         target_name=target.name,

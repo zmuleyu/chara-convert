@@ -1,0 +1,3 @@
+# Copy to .dev.vars (gitignored) for `wrangler dev`. Production uses
+# `wrangler secret put ANTHROPIC_API_KEY` instead.
+ANTHROPIC_API_KEY=sk-ant-…

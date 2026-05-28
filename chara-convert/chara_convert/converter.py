@@ -12,10 +12,15 @@ from .registry import PlatformSpec
 @dataclass
 class ConvertedCard:
     """Result of preset conversion: a dict of target-field → content,
-    plus metadata about what was changed."""
+    plus metadata about what was changed.
+
+    For layered targets (FictionLab), output goes into ``layers`` instead of
+    ``fields``. Manual gaps for layered output are prefixed ``<layer>.<field>``.
+    """
 
     target_slug: str
     fields: dict[str, str] = field(default_factory=dict)
+    layers: dict[str, dict[str, str]] | None = None
     lorebook_entries: list[dict[str, Any]] = field(default_factory=list)
     applied_rules: list[str] = field(default_factory=list)
     manual_gaps: list[str] = field(default_factory=list)
@@ -74,8 +79,98 @@ def _build_saucepan_scenario(card: NormalizedCard) -> str:
     return "\n\n".join(parts)
 
 
+def _extras_str(card: NormalizedCard, key: str) -> str:
+    """Read a string-valued key from card.extras, defaulting to empty."""
+    val = (card.extras or {}).get(key, "")
+    return val if isinstance(val, str) else ""
+
+
+def _fictionlab_field_value(card: NormalizedCard, layer: str, fname: str) -> str:
+    """Route a NormalizedCard value (or PR 2 split extras) to a FictionLab layer field."""
+    if layer == "character":
+        if fname == "name":
+            return card.name
+        if fname == "description":
+            # Prefer split content from CAI/Chai sources; fall back to plain description.
+            return (
+                _extras_str(card, "cai_definition_description")
+                or _extras_str(card, "chai_prompt_rest")
+                or card.description
+            )
+        if fname == "personality":
+            return card.personality
+        if fname == "example_dialogue":
+            return card.mes_example
+        # appearance is AI-generated (PR 4); leave empty.
+        return ""
+
+    if layer == "location":
+        if fname == "location_description":
+            return _extras_str(card, "cai_definition_location")
+        # location_name + atmosphere need user input / AI (PR 4).
+        return ""
+
+    if layer == "scenario":
+        if fname == "first_message":
+            return card.first_mes
+        if fname == "scenario_intro":
+            return card.scenario
+        if fname == "custom_instructions":
+            parts = [
+                _extras_str(card, "cai_definition_instructions"),
+                _extras_str(card, "chai_prompt_instructions"),
+            ]
+            return "\n\n".join(p for p in parts if p)
+        # scenario_name / linked_characters / linked_location need user input.
+        return ""
+
+    if layer == "lore":
+        if fname == "content":
+            return _extras_str(card, "cai_definition_lore")
+        # piece_name + activation_condition need user input / AI.
+        return ""
+
+    return ""
+
+
+def _convert_layered(card: NormalizedCard, target: PlatformSpec) -> ConvertedCard:
+    """Build a layered ConvertedCard for FictionLab-shaped targets."""
+    assert target.layers is not None  # caller-checked
+    layers_out: dict[str, dict[str, str]] = {}
+    result = ConvertedCard(target_slug=target.slug, layers=layers_out)
+    rules: list[str] = []
+
+    for lname, layer in target.layers.items():
+        out: dict[str, str] = {}
+        for fname, fspec in layer.fields.items():
+            val = _fictionlab_field_value(card, lname, fname)
+            if fspec.max_chars > 0 and len(val) > fspec.max_chars:
+                val = val[: fspec.max_chars - 3] + "..."
+                rules.append(f"truncated {lname}.{fname} to {fspec.max_chars} chars")
+            if val:
+                out[fname] = val
+        layers_out[lname] = out
+        for fname, fspec in layer.fields.items():
+            if fspec.required and fname not in out:
+                result.manual_gaps.append(f"{lname}.{fname}")
+
+    if card.first_mes:
+        rules.append("routed first_mes to scenario.first_message layer")
+    if (card.extras or {}).get("cai_definition_instructions") or (
+        card.extras or {}
+    ).get("chai_prompt_instructions"):
+        rules.append("routed source-paste instructions to scenario.custom_instructions")
+    if (card.extras or {}).get("cai_definition_lore"):
+        rules.append("routed CAI lore paragraphs to lore.content")
+
+    result.applied_rules = rules
+    return result
+
+
 def convert(card: NormalizedCard, target: PlatformSpec) -> ConvertedCard:
     """Run preset conversion rules."""
+    if target.layers is not None:
+        return _convert_layered(card, target)
     result = ConvertedCard(target_slug=target.slug)
     rules: list[str] = []
 

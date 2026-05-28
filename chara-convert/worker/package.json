@@ -1,0 +1,18 @@
+{
+  "name": "chara-convert-llm-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker that proxies Anthropic Messages API for chara-convert (origin allowlist + KV rate limit + daily cost ceiling). Source ported from aichathub fed7839 per 2026-05-28 staticization handoff.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "wrangler": "^3.78.0"
+  }
+}
