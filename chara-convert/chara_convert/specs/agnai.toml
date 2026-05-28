@@ -1,0 +1,33 @@
+name = "Agnai"
+slug = "agnai"
+version = 1
+
+[fields]
+name           = { required = true,  max_chars = 0,  type = "text" }
+description    = { required = true,  max_chars = 0,  type = "text" }
+personality    = { required = false, max_chars = 0,  type = "text" }
+scenario       = { required = false, max_chars = 0,  type = "text" }
+first_mes      = { required = true,  max_chars = 0,  type = "text" }
+mes_example    = { required = false, max_chars = 0,  type = "text" }
+creator        = { required = false, max_chars = 0,  type = "text" }
+creator_notes  = { required = false, max_chars = 0,  type = "text" }
+tags           = { required = false, max_chars = 0,  type = "list" }
+system_prompt  = { required = false, max_chars = 0,  type = "text" }
+post_history_instructions = { required = false, max_chars = 0, type = "text" }
+alternate_greetings = { required = false, max_chars = 0, type = "list" }
+
+[lorebook]
+supported = true
+entry_fields = ["name", "keys", "content", "order", "priority", "comment"]
+recursive_scanning = false
+
+[greeting]
+multiple = true
+max_count = 0
+
+[example_dialogue]
+formats = ["Plain", "W++"]
+preferred = "Plain"
+
+[notes]
+"format" = "Open-source. Supports Tavern V2 PNG import."

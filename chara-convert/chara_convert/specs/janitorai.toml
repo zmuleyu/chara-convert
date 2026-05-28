@@ -1,0 +1,39 @@
+name = "Janitor AI"
+slug = "janitorai"
+version = 1
+
+[fields]
+name           = { required = true,  max_chars = 0,  type = "text" }
+description    = { required = true,  max_chars = 0,  type = "text" }
+personality    = { required = false, max_chars = 0,  type = "text" }
+scenario       = { required = false, max_chars = 0,  type = "text" }
+first_mes      = { required = true,  max_chars = 0,  type = "text" }
+mes_example    = { required = false, max_chars = 0,  type = "text" }
+creator        = { required = false, max_chars = 0,  type = "text" }
+creator_notes  = { required = false, max_chars = 0,  type = "text" }
+tags           = { required = false, max_chars = 0,  type = "list" }
+system_prompt  = { required = false, max_chars = 0,  type = "text" }
+
+# Janitor AI does not use these V2 advanced fields natively
+post_history_instructions = { required = false, max_chars = 0, type = "text", native = false }
+personality_summary       = { required = false, max_chars = 0, type = "text", native = false }
+depth_prompt              = { required = false, max_chars = 0, type = "text", native = false }
+depth                     = { required = false, max_chars = 0, type = "int",  native = false }
+alternate_greetings       = { required = false, max_chars = 0, type = "list", native = false }
+
+[lorebook]
+supported = true
+entry_fields = ["name", "keys", "content", "order", "priority", "comment"]
+recursive_scanning = false
+
+[greeting]
+multiple = true
+max_count = 0
+
+[example_dialogue]
+formats = ["Plain", "W++"]
+preferred = "Plain"
+
+[notes]
+"format" = "Imports PNG V2 cards natively. Also supports direct card import without extensions as of 2026."
+"style_hint" = "Janitor AI prefers Plain format example dialogue over W++. Personality and Scenario are combined into the main Description in practice."

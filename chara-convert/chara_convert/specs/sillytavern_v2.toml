@@ -1,0 +1,38 @@
+name = "SillyTavern V2"
+slug = "sillytavern"
+version = 2
+
+[fields]
+name           = { required = true,  max_chars = 0,  type = "text" }
+description    = { required = true,  max_chars = 0,  type = "text", aliases = ["char_persona"] }
+personality    = { required = false, max_chars = 0,  type = "text" }
+scenario       = { required = false, max_chars = 0,  type = "text", aliases = ["world_scenario"] }
+first_mes      = { required = true,  max_chars = 0,  type = "text", aliases = ["char_greeting"] }
+mes_example    = { required = false, max_chars = 0,  type = "text", aliases = ["example_dialogue"] }
+creator        = { required = false, max_chars = 0,  type = "text" }
+creator_notes  = { required = false, max_chars = 0,  type = "text", aliases = ["creatorcomment"] }
+character_version = { required = false, max_chars = 0, type = "text" }
+tags           = { required = false, max_chars = 0,  type = "list" }
+system_prompt  = { required = false, max_chars = 0,  type = "text" }
+post_history_instructions = { required = false, max_chars = 0, type = "text" }
+personality_summary = { required = false, max_chars = 0, type = "text" }
+depth_prompt   = { required = false, max_chars = 0,  type = "text" }
+depth          = { required = false, max_chars = 0,  type = "int" }
+alternate_greetings = { required = false, max_chars = 0, type = "list" }
+
+[lorebook]
+supported = true
+entry_fields = ["name", "keys", "content", "order", "priority", "comment", "selective", "secondary_keys"]
+recursive_scanning = true
+
+[greeting]
+multiple = true
+max_count = 0
+
+[example_dialogue]
+formats = ["W++", "Plain", "XML"]
+preferred = "Plain"
+
+[notes]
+"format" = "PNG with embedded JSON in tEXt chunk (keyword: chara)"
+"compatibility" = "De-facto open standard. Supported by Chub, Janitor AI, Agnai, RisuAI, Backyard AI, etc."

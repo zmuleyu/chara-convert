@@ -1,0 +1,25 @@
+name = "NovelAI"
+slug = "novelai"
+version = 1
+
+[fields]
+# NovelAI has NO traditional character fields — lorebook only
+# These are mapped for reference but not native
+name        = { required = false, max_chars = 0, type = "text", native = false }
+description = { required = false, max_chars = 0, type = "text", native = false }
+
+[lorebook]
+supported = true
+entry_fields = ["keys", "content", "enabled", "insertion_order", "case_sensitive", "selective", "secondary_keys", "constant", "position", "priority", "comment"]
+recursive_scanning = true
+
+[greeting]
+multiple = false
+
+[example_dialogue]
+formats = ["Plain"]
+preferred = "Plain"
+
+[notes]
+"format" = "PNG Card with 'Naidata' base64 JSON metadata, or .lorebook JSON file"
+"style_hint" = "NovelAI is lorebook-only. Character persona must be embedded in lorebook entries or story context."

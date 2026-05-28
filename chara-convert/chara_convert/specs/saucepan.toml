@@ -1,0 +1,30 @@
+name = "Saucepan AI"
+slug = "saucepan"
+version = 1
+
+[fields]
+backstory  = { required = true,  max_chars = 3000, type = "text" }
+scenario   = { required = true,  max_chars = 1500, type = "text" }
+# Source fields mapped for conversion
+name       = { required = false, max_chars = 0,    type = "text", native = false }
+personality = { required = false, max_chars = 0,   type = "text", native = false }
+first_mes  = { required = false, max_chars = 0,    type = "text", native = false }
+mes_example = { required = false, max_chars = 0,   type = "text", native = false }
+tags       = { required = false, max_chars = 0,    type = "list", native = false }
+
+[lorebook]
+supported = true
+entry_fields = ["keys", "content"]
+recursive_scanning = false
+
+[greeting]
+multiple = false
+
+[example_dialogue]
+formats = ["Plain"]
+preferred = "Plain"
+
+[notes]
+"format" = "Web UI only — no export/import file format. Manual copy-paste required."
+"style_hint" = "Backstory and Scenario have strict character limits. Lorebook entries use simple keyword->content mapping."
+"spice_levels" = "Mild / Spicy / Extra Spicy"

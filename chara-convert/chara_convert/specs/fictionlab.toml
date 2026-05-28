@@ -1,0 +1,46 @@
+name = "FictionLab"
+slug = "fictionlab"
+version = 1
+
+# FictionLab uses a four-layer architecture (Character / Location / Scenario / Lore).
+# Source: group_docs/FictionLab-Import-Assistant-Dev-Spec.md §3.1
+# Unlike flat specs (SillyTavern, Janitor, etc.) where a single character card holds
+# everything, FictionLab separates character attributes from scenario context — most
+# importantly, the opening message (First Message) belongs to Scenario, not Character.
+
+[layers.character]
+# Pure character attributes — reusable across scenarios.
+[layers.character.fields]
+name             = { required = true,  max_chars = 0, type = "text" }
+description      = { required = true,  max_chars = 0, type = "text" }
+personality      = { required = false, max_chars = 0, type = "text" }
+example_dialogue = { required = false, max_chars = 0, type = "text", aliases = ["mes_example"] }
+appearance       = { required = false, max_chars = 0, type = "text" }
+
+[layers.location]
+# Independent location cards — peer to character cards.
+[layers.location.fields]
+location_name        = { required = true,  max_chars = 0, type = "text" }
+location_description = { required = false, max_chars = 0, type = "text" }
+atmosphere           = { required = false, max_chars = 0, type = "text" }
+
+[layers.scenario]
+# Scenario binds characters + location; owns first message and custom instructions.
+[layers.scenario.fields]
+scenario_name       = { required = true,  max_chars = 0, type = "text" }
+scenario_intro      = { required = false, max_chars = 0, type = "text" }
+first_message       = { required = true,  max_chars = 0, type = "text", aliases = ["first_mes", "char_greeting"] }
+linked_characters   = { required = false, max_chars = 0, type = "list" }
+linked_location     = { required = false, max_chars = 0, type = "text" }
+custom_instructions = { required = false, max_chars = 0, type = "text" }
+
+[layers.lore]
+# Cross-scenario worldbuilding pieces.
+[layers.lore.fields]
+piece_name           = { required = true,  max_chars = 0, type = "text" }
+content              = { required = true,  max_chars = 0, type = "text" }
+activation_condition = { required = false, max_chars = 0, type = "text" }
+
+[notes]
+"format" = "No native export format yet. Output is a Markdown document organized by the four layers, ready for copy-paste into FictionLab UI."
+"first_message_owner" = "scenario — First Message belongs to Scenario, NOT Character Card. This is the key structural difference from SillyTavern/Chai/CAI."

@@ -1,0 +1,30 @@
+name = "Nomi"
+slug = "nomi"
+version = 1
+
+[fields]
+backstory           = { required = true,  max_chars = 0, type = "text" }
+communication_style = { required = false, max_chars = 0, type = "text" }
+shared_notes        = { required = false, max_chars = 0, type = "text" }
+
+# Mapped from source but not native to Nomi
+name                = { required = false, max_chars = 0, type = "text", native = false }
+personality         = { required = false, max_chars = 0, type = "text", native = false }
+scenario            = { required = false, max_chars = 0, type = "text", native = false }
+first_mes           = { required = false, max_chars = 0, type = "text", native = false }
+mes_example         = { required = false, max_chars = 0, type = "text", native = false }
+tags                = { required = false, max_chars = 0, type = "list", native = false }
+
+[lorebook]
+supported = false
+
+[greeting]
+multiple = false
+
+[example_dialogue]
+formats = ["Plain"]
+preferred = "Plain"
+
+[notes]
+"format" = "No export format. Text must be manually copied into Nomi Shared Notes."
+"style_hint" = "Nomi uses action asterisks (*action*) for roleplay. Backstory is the most important field."
