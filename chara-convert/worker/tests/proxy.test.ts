@@ -26,6 +26,7 @@ function makeEnv(overrides: Partial<ProxyEnv> = {}): ProxyEnv {
     COST_CEILING_DAILY: '10000',
     ANTHROPIC_API_URL: 'https://api.anthropic.test/v1/messages',
     ANTHROPIC_API_VERSION: '2023-06-01',
+    LLM_AUTH_STYLE: 'bearer',
     RATE_LIMIT_KV: makeKV(),
     ...overrides,
   };
@@ -149,6 +150,29 @@ describe('chara-convert llm-proxy worker', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED);
     expect(await res.json()).toEqual(upstreamBody);
+  });
+
+  it('LLM_AUTH_STYLE=x-api-key sends x-api-key header instead of Authorization Bearer', async () => {
+    const upstreamBody = { id: 'msg_x', content: [{ type: 'text', text: 'ok' }] };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(upstreamBody), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const env = makeEnv({ LLM_AUTH_STYLE: 'x-api-key' });
+    const res = await handler.fetch(
+      buildRequest({ method: 'POST', origin: ALLOWED, body: validBody }),
+      env,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0]!;
+    const sentHeaders = (init as RequestInit).headers as Record<string, string>;
+    expect(sentHeaders['x-api-key']).toBe('sk-test');
+    expect(sentHeaders['Authorization']).toBeUndefined();
+    expect(res.status).toBe(200);
   });
 
   it('stream:true passes Content-Type text/event-stream through', async () => {

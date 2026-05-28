@@ -17,18 +17,18 @@ id = "b240216870df41b5998eb183822757ee"
 preview_id = "251c98eaa1f940f5a416460c0d74650a"
 
 [vars]
-# ADJUST: list every Origin that chara-convert frontends (CLI users, Gradio webui,
-# CI smoke runs) will present. Anything outside this list gets 403 origin_not_allowed.
+# Origin allowlist for chara-convert frontends (CLI users, Gradio webui, CI smoke runs).
+# Anything outside this list gets 403 origin_not_allowed.
 ALLOWED_ORIGINS = "https://aichathub.uk,https://nsfw.aichathub.uk,http://localhost:4321,http://localhost:7860"
 RATE_LIMIT_PER_MIN = "20"
 COST_CEILING_DAILY = "10000"
-# Upstream Messages endpoint. Temporarily pointed at OpenRouter's Anthropic
-# Messages-compatible endpoint (Bearer auth). Restore to
-# https://api.anthropic.com/v1/messages when a real Anthropic key is in use,
-# and revert the Authorization header in src/llm-proxy.ts back to x-api-key
-# (see TODO(provider-abstraction)).
+
+# Upstream Messages endpoint. Switch ANTHROPIC_API_URL + LLM_AUTH_STYLE together:
+#   OpenRouter (Anthropic-compatible): URL=https://openrouter.ai/api/v1/messages, AUTH_STYLE=bearer
+#   Anthropic (direct):                URL=https://api.anthropic.com/v1/messages, AUTH_STYLE=x-api-key
 ANTHROPIC_API_URL = "https://openrouter.ai/api/v1/messages"
 ANTHROPIC_API_VERSION = "2023-06-01"
+LLM_AUTH_STYLE = "bearer"
 
 # Secret (NOT in repo): wrangler secret put ANTHROPIC_API_KEY
-# When upstream is OpenRouter, set the OpenRouter key here.
+# Set OpenRouter key when ANTHROPIC_API_URL points at OpenRouter; real Anthropic key otherwise.

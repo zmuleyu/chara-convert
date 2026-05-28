@@ -83,7 +83,10 @@ def test_api_base_env_flows_to_anthropic_client(
     client, status = build_ai_client_or_none()
     assert status == "anthropic"
     assert client is not None
-    assert captured == {"base_url": "https://aichathub.uk/api/llm/proxy"}
+    assert captured == {
+        "base_url": "https://aichathub.uk/api/llm/proxy",
+        "model": anthropic_module.DEFAULT_MODEL,
+    }
 
 
 def test_no_api_base_env_passes_none_base_url(
@@ -92,6 +95,7 @@ def test_no_api_base_env_passes_none_base_url(
     """Without CHARA_CONVERT_API_BASE, factory passes base_url=None (direct API)."""
     monkeypatch.delenv("CHARA_CONVERT_AI_MOCK", raising=False)
     monkeypatch.delenv("CHARA_CONVERT_API_BASE", raising=False)
+    monkeypatch.delenv("CHARA_CONVERT_MODEL", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
 
     captured: dict[str, Any] = {}
@@ -104,4 +108,48 @@ def test_no_api_base_env_passes_none_base_url(
 
     _client, status = build_ai_client_or_none()
     assert status == "anthropic"
-    assert captured == {"base_url": None}
+    assert captured == {"base_url": None, "model": anthropic_module.DEFAULT_MODEL}
+
+
+def test_chara_convert_model_env_propagates_to_anthropic_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CHARA_CONVERT_MODEL overrides DEFAULT_MODEL when set."""
+    monkeypatch.delenv("CHARA_CONVERT_AI_MOCK", raising=False)
+    monkeypatch.delenv("CHARA_CONVERT_API_BASE", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("CHARA_CONVERT_MODEL", "anthropic/claude-3.5-haiku")
+
+    captured: dict[str, Any] = {}
+
+    class _RecordingAnthropic:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(anthropic_module, "AnthropicClient", _RecordingAnthropic)
+
+    _client, status = build_ai_client_or_none()
+    assert status == "anthropic"
+    assert captured["model"] == "anthropic/claude-3.5-haiku"
+
+
+def test_empty_chara_convert_model_falls_back_to_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty CHARA_CONVERT_MODEL is treated as unset → DEFAULT_MODEL wins."""
+    monkeypatch.delenv("CHARA_CONVERT_AI_MOCK", raising=False)
+    monkeypatch.delenv("CHARA_CONVERT_API_BASE", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("CHARA_CONVERT_MODEL", "")
+
+    captured: dict[str, Any] = {}
+
+    class _RecordingAnthropic:
+        def __init__(self, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(anthropic_module, "AnthropicClient", _RecordingAnthropic)
+
+    _client, status = build_ai_client_or_none()
+    assert status == "anthropic"
+    assert captured["model"] == anthropic_module.DEFAULT_MODEL

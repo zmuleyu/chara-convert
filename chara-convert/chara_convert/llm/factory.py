@@ -34,8 +34,9 @@ def build_ai_client_or_none() -> tuple[LLMClient | None, Status]:
     if mock is not None:
         return MockLLMClient(responses=mock), "mock"
     if os.environ.get("ANTHROPIC_API_KEY"):
-        from chara_convert.llm.anthropic import AnthropicClient
+        from chara_convert.llm.anthropic import DEFAULT_MODEL, AnthropicClient
 
         base_url = os.environ.get("CHARA_CONVERT_API_BASE") or None
-        return AnthropicClient(base_url=base_url), "anthropic"
+        model = os.environ.get("CHARA_CONVERT_MODEL") or DEFAULT_MODEL
+        return AnthropicClient(base_url=base_url, model=model), "anthropic"
     return None, "none"

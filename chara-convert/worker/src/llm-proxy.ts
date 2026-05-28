@@ -1,12 +1,5 @@
 // LLM proxy helpers — origin allowlist, KV-backed rate limit + daily cost ceiling,
 // Anthropic Messages pass-through. Wire protocol matches Anthropic verbatim.
-//
-// TODO(provider-abstraction): currently the upstream is configurable via
-// ANTHROPIC_API_URL but auth uses Authorization: Bearer (OpenRouter-style) to
-// allow temporary OpenRouter pass-through for the Anthropic Messages-compatible
-// endpoint at https://openrouter.ai/api/v1/messages. When restoring direct
-// Anthropic access, either revert auth header to x-api-key or introduce a
-// PROVIDER env var that switches header style.
 
 export interface ProxyEnv {
   ANTHROPIC_API_KEY: string;
@@ -15,6 +8,7 @@ export interface ProxyEnv {
   COST_CEILING_DAILY: string;
   ANTHROPIC_API_URL: string;
   ANTHROPIC_API_VERSION: string;
+  LLM_AUTH_STYLE?: string;
   RATE_LIMIT_KV: KVNamespace;
 }
 
@@ -113,11 +107,15 @@ export function validateAnthropicBody(raw: unknown): raw is AnthropicBody {
 
 export async function forwardToAnthropic(body: AnthropicBody, env: ProxyEnv): Promise<Response> {
   const wantsStream = body.stream === true;
+  const authHeader: Record<string, string> =
+    env.LLM_AUTH_STYLE === 'bearer'
+      ? { Authorization: `Bearer ${env.ANTHROPIC_API_KEY}` }
+      : { 'x-api-key': env.ANTHROPIC_API_KEY };
   const upstream = await fetch(env.ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.ANTHROPIC_API_KEY}`,
+      ...authHeader,
       'anthropic-version': env.ANTHROPIC_API_VERSION,
     },
     body: JSON.stringify(body),
