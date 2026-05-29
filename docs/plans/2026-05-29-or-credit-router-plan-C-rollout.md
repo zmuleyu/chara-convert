@@ -4,9 +4,29 @@
 
 ## Status snapshot — 2026-05-29
 
-**Forward-compat slice landed** (commit pending): `apps/web/src/lib/billing/userId.ts` (localStorage-backed v4 UUID, the "BYOK identifier"), `AiAssistPanel` sends `X-User-Id` on `/ai/enrich` and renders dedicated UI for `insufficient_credit` / `service_unavailable` (4xx JSON envelope) and mid-stream error frames. Vitest 33/33 green; `astro check` 0/0/0. Legacy `LLM_ROUTER_MODE=legacy` path unchanged — server ignores the new header.
+**Local migration DONE** — Tasks 1, 1.5, 2, 2.5, 2.6, 5, 5.5, 5.6, 5.7 all landed and verified end-to-end against `wrangler dev --local` + `astro dev` via Playwright MCP. Commits on branch `feat/or-credit-router`:
+- `0ec4bdb` Task 1 — `useBilling` rewritten to poll `/credit/balance` with `X-User-Id` and a `loaded` flag (keys off `chara-convert-user-id` so it shares identity with the shipped `userId.ts` from 5fad6c8 — Plan C's `cc.userId` suggestion would have created a divergent identity)
+- `d09dde0` Task 1.5 — `MIN_BALANCE_TO_TRY = 100` shared constant
+- `27942df` Task 2 — `tiers.ts` annotated dormant; no live imports (verified by grep)
+- (Task 2.5) — `UpgradeCTA` deleted, `LowCreditCTA` (balance-gated) shipped with 4 tests
+- `b040a4b` Task 2.6 — `AiAssistPanel` balance-gated (`Loading…` / `Low credit` / `Generate` states), **merged with the 5fad6c8 error envelope UX** (Plan C's snippet would have regressed it back to generic 'Stream failed.')
+- `6086b56` Task 5 — `fly.toml` `[env] LLM_ROUTER_MODE=legacy` + secrets comments
+- `76f5b4c` Task 5.5 — `pricing.astro` stubbed to "Top-up coming soon"
+- `79750e0` Task 5.6 — `docs.astro` FAQ rewritten to credit-model copy
+- `d0e30c7` **Bug fix uncovered by L1** — `workers/billing/src/index.ts` was missing CORS; browser at `:4321` was blocked from fetching `:8787/api/billing/credit/balance`. Added an allow-listed `withCors()` wrapper + OPTIONS preflight short-circuit + 3 new endpoints tests.
 
-**Blocked on D1 provisioning** (Tasks 1, 1.5, 2, 2.5, 2.6 full balance-based migration; Tasks 6, 7 deploy): rewriting `useBilling` to poll `/credit/balance` would replace the working free-quota UX (`tier/aiCap/aiUsed`) with a "balance=0, can't try" UX until credits are seeded. Defer until `workers/billing/wrangler.toml` has real `database_id` + `preview_database_id` and a seed grant can land for staging-tester accounts. Tasks 3 (BYOK runbook), 4 (rollout runbook), 5 (`fly.toml` env vars) can be authored independently and should land alongside the deploy session, not pre-emptively (text would speculate without a verified-once anchor).
+Test deltas: `apps/web` vitest 33 → 38, Worker vitest 33 → 36; `astro check` 0/0/0.
+
+**L1 verification** (Playwright MCP against the local stack):
+- Happy: seeded `e2e-test-user` with 50000 credits → AiAssistPanel showed "Generate" enabled, no LowCreditCTA banner
+- Sad: `UPDATE credit_balance SET balance=50 WHERE user_id='e2e-test-user'` → page reload → button switched to "Low credit" (disabled), banner showed "Low credit (50 credit left). Top-up your account"
+- Network: `GET /api/billing/credit/balance` returned 200 with `x-user-id: e2e-test-user` request header echoed in the worker logs
+- Screenshot evidence saved to `apps/web/.playwright-mcp/phase-c-l1-sad-path.png`
+
+**Still blocked** (out of this session's scope):
+- Tasks 3 (OR BYOK runbook) and 4 (deploy runbook) — both empirical docs; should land alongside the first real deploy session, not pre-emptively
+- Task 6 (staging E2E) — needs real CF D1 instance + staging worker URL
+- Prod deploy — `workers/billing/wrangler.toml` still has `database_id = "REPLACE_AFTER_CREATE"`; needs `wrangler d1 create chara-convert-credit` (CLI; auth is ready locally at `~/.wrangler/config/default.toml`) then update wrangler.toml + apply migration + deploy. Deliberately not done from feature branch — CI on master push already deploys to the live `chara-convert-billing.zmuleyu.workers.dev`, so the safer path is PR-merge → CI handles it
 
 **Goal:** Replace the web client's `useBilling` hook with credit-balance polling, write the BYOK runbook, deploy + flip the feature flag in staging then prod.
 
