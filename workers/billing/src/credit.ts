@@ -150,3 +150,25 @@ export async function refund(
 
   return { newBalance };
 }
+
+export async function refundOpenHoldsOlderThan(
+  db: D1Database,
+  thresholdMs: number,
+): Promise<number> {
+  const rows = await db
+    .prepare(
+      "SELECT hold_id FROM credit_hold WHERE status='open' AND created_at < ? ORDER BY created_at LIMIT 500",
+    )
+    .bind(thresholdMs)
+    .all<{ hold_id: string }>();
+  let n = 0;
+  for (const row of rows.results) {
+    try {
+      await refund(db, row.hold_id);
+      n += 1;
+    } catch {
+      // race with concurrent debit — skip; next cron tick re-evaluates
+    }
+  }
+  return n;
+}

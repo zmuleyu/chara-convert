@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import { applyMigration } from './helpers';
-import { getBalance, hold, InsufficientCredit, debit, refund } from '../src/credit';
+import { getBalance, hold, InsufficientCredit, debit, refund, refundOpenHoldsOlderThan } from '../src/credit';
 
 declare const __MIGRATION_SQL__: string;
 
@@ -186,5 +186,41 @@ describe('refund', () => {
       "INSERT INTO credit_hold VALUES ('h-debited', 'u-10', 50, 'debited', ?, ?)",
     ).bind(Date.now(), Date.now()).run();
     await expect(refund(env.CREDIT_DB, 'h-debited')).rejects.toThrow(/hold_already_settled/);
+  });
+});
+
+describe('refundOpenHoldsOlderThan', () => {
+  it('refunds only open holds with created_at < threshold', async () => {
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const fiveMinAgo = now - 5 * 60 * 1000;
+
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_balance VALUES ('u-orph', 0, 200, ?)",
+    ).bind(now).run();
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_hold VALUES ('h-old', 'u-orph', 100, 'open', ?, NULL)",
+    ).bind(oneHourAgo - 1000).run();
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_hold VALUES ('h-fresh', 'u-orph', 100, 'open', ?, NULL)",
+    ).bind(fiveMinAgo).run();
+
+    const n = await refundOpenHoldsOlderThan(env.CREDIT_DB, oneHourAgo);
+    expect(n).toBe(1);
+
+    const old = await env.CREDIT_DB.prepare(
+      "SELECT status FROM credit_hold WHERE hold_id='h-old'",
+    ).first();
+    expect(old).toEqual({ status: 'refunded' });
+
+    const fresh = await env.CREDIT_DB.prepare(
+      "SELECT status FROM credit_hold WHERE hold_id='h-fresh'",
+    ).first();
+    expect(fresh).toEqual({ status: 'open' });
+
+    const bal = await env.CREDIT_DB.prepare(
+      'SELECT balance, held FROM credit_balance WHERE user_id=?',
+    ).bind('u-orph').first();
+    expect(bal).toEqual({ balance: 100, held: 100 });
   });
 });
