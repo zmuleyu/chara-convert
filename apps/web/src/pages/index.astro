@@ -1,16 +1,57 @@
 ---
 import BaseLayout from '~/layouts/BaseLayout.astro';
-import HeroDemo from '~/islands/HeroDemo.tsx';
+import SampleButton from '~/islands/SampleButton.tsx';
 const base = import.meta.env.BASE_URL;
 ---
-<BaseLayout title="Move your character anywhere">
-  <h1 class="text-4xl font-bold">Move your character card. Anywhere.</h1>
-  <p class="mt-4 text-lg text-slate-600 max-w-2xl">
-    Drag a CAI / Chai / Tavern card in. Get a ready-to-use card for
-    FictionLab, NovelAI, RisuAI, Agnai, Backyard, JanitorAI, Nomi, or Saucepan.
-  </p>
-  <div class="mt-8 flex gap-4">
-    <a href={`${base}convert`} class="px-6 py-3 bg-slate-900 text-white rounded">Try it now</a>
-    <HeroDemo client:visible />
-  </div>
+<BaseLayout
+  title="Move your character anywhere"
+  description="Drag a CAI / Chai / Tavern card in. Get a ready-to-use card for FictionLab, NovelAI, RisuAI, Agnai, Backyard, JanitorAI, Nomi, PolyBuzz, or Saucepan — with optional AI assist for missing fields."
+>
+  <section>
+    <h1 class="text-4xl font-bold">Move your character card. Anywhere.</h1>
+    <p class="mt-4 text-lg text-slate-600 max-w-2xl">
+      Drag a CAI / Chai / Tavern card in. Get a ready-to-use card for
+      FictionLab, NovelAI, RisuAI, Agnai, Backyard, JanitorAI, Nomi, PolyBuzz, or Saucepan.
+      Inline AI assist fills the gaps the source platform never let you write.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a
+        href={`${base}convert`}
+        class="px-6 py-3 bg-slate-900 text-white rounded"
+      >Open the workbench</a>
+      <SampleButton
+        client:visible
+        label="CAI sample"
+        sampleUrl={`${base}samples/cai.txt`}
+        detectedPlatform="character_ai"
+      />
+      <SampleButton
+        client:visible
+        label="Chai sample"
+        sampleUrl={`${base}samples/chai.txt`}
+        detectedPlatform="chai"
+      />
+      <SampleButton
+        client:visible
+        label="SillyTavern sample"
+        sampleUrl={`${base}samples/sillytavern.json`}
+        detectedPlatform="sillytavern_v2"
+      />
+    </div>
+  </section>
+
+  <section class="mt-16 grid md:grid-cols-3 gap-6">
+    <div class="border rounded p-5">
+      <h2 class="font-semibold">1. Drop a card</h2>
+      <p class="mt-2 text-sm text-slate-600">PNG, JSON, or pasted plaintext. We auto-detect the source platform.</p>
+    </div>
+    <div class="border rounded p-5">
+      <h2 class="font-semibold">2. See the gap</h2>
+      <p class="mt-2 text-sm text-slate-600">Ready-score + missing-field map for your chosen target platform.</p>
+    </div>
+    <div class="border rounded p-5">
+      <h2 class="font-semibold">3. Export anywhere</h2>
+      <p class="mt-2 text-sm text-slate-600">Markdown, JSON, hover-copy per field. PNG export ships October 2026.</p>
+    </div>
+  </section>
 </BaseLayout>
