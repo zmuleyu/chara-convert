@@ -1,9 +1,11 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const SAMPLES = join(process.cwd(), 'public', 'samples');
+
 test('AI assist personality field, accept, writes override', async ({ page }) => {
-  const cai = readFileSync(join(__dirname, '..', '..', 'public', 'samples', 'cai.txt'), 'utf-8');
+  const cai = readFileSync(join(SAMPLES, 'cai.txt'), 'utf-8');
   await page.goto('/chara-convert/convert');
   await page.getByPlaceholder(/paste your character/i).fill(cai);
   await page.getByRole('button', { name: /detect source/i }).click();
