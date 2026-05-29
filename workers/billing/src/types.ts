@@ -1,7 +1,8 @@
-// Env shape — referenced by index.ts, credit.ts, scheduled handler.
+// Env shape — referenced by index.ts, credit.ts, scheduled handler, CreditDO.
 export interface Env {
   RATE_LIMIT_KV: KVNamespace;
   CREDIT_DB: D1Database;
+  CREDIT_DO: DurableObjectNamespace;
 }
 
 export interface BalanceView {
