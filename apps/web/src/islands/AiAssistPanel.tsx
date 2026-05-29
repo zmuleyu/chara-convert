@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '~/lib/store';
 import { useBilling } from '~/lib/billing/client';
-import { getOrCreateUserId } from '~/lib/billing/userId';
+import { MIN_BALANCE_TO_TRY } from '~/lib/billing/constants';
 import LowCreditCTA from './LowCreditCTA';
 
 interface Props { field: string; onClose: () => void }
@@ -28,19 +28,27 @@ export default function AiAssistPanel({ field, onClose }: Props) {
   const card = useStore((s) => ({ ...(s.sourceCard ?? {}), ...(s.converted ?? {}), ...s.overrides }));
   const setOverride = useStore((s) => s.setOverride);
   const billing = useBilling();
-  const quotaHit = billing.aiCap >= 0 && billing.aiUsed >= billing.aiCap;
+  const lowCredit = billing.loaded && billing.balance < MIN_BALANCE_TO_TRY;
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'streaming' | 'done' | 'error'>('idle');
   const [errorInfo, setErrorInfo] = useState<ErrorKind>({ kind: 'none' });
 
   async function generate() {
+    if (!billing.userId) {
+      // Defense in depth: useBilling auto-generates a userId via
+      // getOrCreateUserId, so null here implies SSR / non-browser context that
+      // shouldn't reach this handler.
+      setErrorInfo({ kind: 'generic', message: 'No user id available.' });
+      setStatus('error');
+      return;
+    }
     setText(''); setStatus('streaming'); setErrorInfo({ kind: 'none' });
     try {
       const res = await fetch(`${BASE}/api/ai/enrich`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': getOrCreateUserId(),
+          'X-User-Id': billing.userId,
         },
         body: JSON.stringify({ card, field }),
       });
@@ -92,6 +100,16 @@ export default function AiAssistPanel({ field, onClose }: Props) {
 
   function accept() { setOverride(field, text.trim()); onClose(); }
 
+  const buttonLabel = !billing.loaded
+    ? 'Loading…'
+    : lowCredit
+      ? 'Low credit'
+      : status === 'streaming'
+        ? 'Streaming…'
+        : status === 'done'
+          ? 'Regenerate'
+          : 'Generate';
+
   return (
     <aside role="dialog" aria-label={`AI assist for ${field}`}
       className="fixed right-0 top-0 h-full w-96 bg-white border-l shadow-xl p-4 space-y-3 overflow-y-auto">
@@ -101,17 +119,14 @@ export default function AiAssistPanel({ field, onClose }: Props) {
       </header>
       <div className="text-xs text-slate-500">Uses other card fields as context.</div>
       <button type="button" onClick={generate}
-        disabled={status === 'streaming' || quotaHit}
+        disabled={!billing.loaded || lowCredit || status === 'streaming'}
         className="px-3 py-1 bg-slate-900 text-white rounded text-sm disabled:opacity-40">
-        {quotaHit ? 'Quota reached' : status === 'streaming' ? 'Streaming…' : status === 'done' ? 'Regenerate' : 'Generate'}
+        {buttonLabel}
       </button>
-      {quotaHit && <LowCreditCTA />}
+      {lowCredit && <LowCreditCTA />}
       <pre className="whitespace-pre-wrap text-sm border rounded p-2 min-h-32 bg-slate-50">{text}</pre>
       {status === 'error' && errorInfo.kind === 'insufficient_credit' && (
         <div className="text-sm text-amber-700 border border-amber-300 bg-amber-50 rounded p-2">
-          {/* Top-up flow lives behind the Creem cutover (Oct 2026); for now we
-              just inform — a "Top up credits" CTA goes here once /api/billing/
-              checkout returns 200 instead of 501. */}
           {errorInfo.message}
         </div>
       )}
