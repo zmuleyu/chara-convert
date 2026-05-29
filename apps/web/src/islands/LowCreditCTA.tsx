@@ -6,9 +6,12 @@ import { MIN_BALANCE_TO_TRY } from '~/lib/billing/constants';
 // matches the same gate the AiAssistPanel button uses, so the CTA and
 // the disabled button appear together.
 export default function LowCreditCTA() {
-  const { balance, loaded, userId } = useBilling();
+  const { balance, loaded, userId, available } = useBilling();
 
   if (!loaded || userId === null) return null;
+  // Hide the CTA when the billing worker is unreachable — pointing the user
+  // at "top-up" makes no sense if we can't even confirm their current balance.
+  if (!available) return null;
   if (balance >= MIN_BALANCE_TO_TRY) return null;
 
   const base = (import.meta.env.BASE_URL as string | undefined) ?? '/chara-convert/';
