@@ -1,11 +1,25 @@
-import { defineConfig } from 'vitest/config';
-import { readFileSync } from 'fs';
-import { execSync } from 'child_process';
-import path from 'path';
+import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-export default defineConfig({
+const migrationSql = readFileSync(
+  join(__dirname, 'migrations', '0001_credit_ledger.sql'),
+  'utf8',
+);
+
+export default defineWorkersConfig({
+  define: {
+    __MIGRATION_SQL__: JSON.stringify(migrationSql),
+  },
   test: {
-    globals: true,
-    environment: 'node',
+    poolOptions: {
+      workers: {
+        wrangler: { configPath: './wrangler.toml' },
+        miniflare: {
+          d1Databases: ['CREDIT_DB'],
+          d1Persist: false,
+        },
+      },
+    },
   },
 });
