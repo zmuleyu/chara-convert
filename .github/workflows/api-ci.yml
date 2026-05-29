@@ -24,8 +24,25 @@ jobs:
       - name: chara-convert suite (must stay green)
         run: pytest -q
         working-directory: chara-convert
+
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f apps/api/Dockerfile -t chara-convert-shim:ci .
+
+  deploy-fly:
+    needs: [test, docker]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-api
+      url: https://chara-convert-shim.fly.dev/healthz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Fly.io deploy
+        working-directory: apps/api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --config fly.toml

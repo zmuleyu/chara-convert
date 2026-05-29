@@ -1,0 +1,45 @@
+name: workers-ci
+on:
+  push:
+    paths:
+      - 'workers/**'
+      - '.github/workflows/workers-ci.yml'
+  pull_request:
+    paths:
+      - 'workers/**'
+jobs:
+  billing-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: workers/billing/package-lock.json
+      - name: Install
+        working-directory: workers/billing
+        run: npm ci
+      - name: Type check (worker)
+        working-directory: workers/billing
+        run: npx tsc --noEmit
+
+  deploy-billing:
+    needs: billing-typecheck
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-billing
+      url: https://chara-convert-billing.workers.dev/api/billing/quota
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Wrangler deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: workers/billing
+          command: deploy
