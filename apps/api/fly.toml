@@ -16,3 +16,19 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 256
+
+[env]
+  # LLM router mode — flip to "or" via `fly secrets set LLM_ROUTER_MODE=or`
+  # after the Worker is deployed and BYOK is configured. Default "legacy"
+  # keeps the existing Anthropic/DeepSeek direct path live so rollback is
+  # a single-command flip with no redeploy.
+  LLM_ROUTER_MODE = "legacy"
+
+# Required secrets (set via `fly secrets set`, NEVER committed):
+#   OPENROUTER_API_KEY  — from the OR dashboard; BYOK keys live there too.
+#                          Required when LLM_ROUTER_MODE=or.
+#   BILLING_WORKER_URL  — https://<worker-name>.workers.dev for the credit
+#                          DO. Required when LLM_ROUTER_MODE=or.
+#   ANTHROPIC_API_KEY   — legacy backend; keep set so a flag flip back to
+#                          "legacy" stays functional.
+#   DEEPSEEK_API_KEY    — also legacy backend.
