@@ -30,7 +30,7 @@ async function proxyToCreditDO(url: URL, req: Request, env: Env, userId: string)
     return await stub.fetch(internalReq);
   } catch (e) {
     console.error('CreditDO unreachable:', e);
-    return err(503, 'bad_request', 'service unavailable');
+    return err(503, 'service_unavailable', 'service unavailable');
   }
 }
 
