@@ -14,6 +14,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    outputs:
+      web-built: ${{ steps.web-build.outputs.built }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,8 +41,21 @@ jobs:
         working-directory: apps/web
         run: npm test
       - name: Build
+        id: web-build
         working-directory: apps/web
-        run: npm run build
+        env:
+          PUBLIC_API_BASE: ${{ vars.PUBLIC_API_BASE || 'https://chara-convert-shim.fly.dev' }}
+          PUBLIC_BILLING_BASE: ${{ vars.PUBLIC_BILLING_BASE || 'https://chara-convert-billing.workers.dev' }}
+        run: |
+          npm run build
+          echo "built=true" >> "$GITHUB_OUTPUT"
+      - name: Upload web dist for deploy job
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
       - name: Playwright browser
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
@@ -56,3 +71,25 @@ jobs:
             apps/web/test-results/
             apps/web/playwright-report/
           retention-days: 7
+
+  deploy-pages:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-web
+      url: https://studio.aichathub.uk/chara-convert/
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+      - name: Cloudflare Pages deploy
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: chara-convert-web
+          directory: dist
+          branch: master
+          wranglerVersion: '3'
