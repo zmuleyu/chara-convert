@@ -62,7 +62,7 @@ export class CreditDO extends DurableObject<Env> {
         } catch (e) {
           if (e instanceof InsufficientCredit) return err(402, 'insufficient_credit', 'balance < amount');
           console.error('CreditDO hold unexpected:', e);
-          return err(500, 'bad_request', 'internal error');
+          return err(500, 'internal_error', 'internal error');
         }
       }
       if (url.pathname === '/api/billing/credit/debit' && req.method === 'POST') {
@@ -76,7 +76,7 @@ export class CreditDO extends DurableObject<Env> {
           if (m === 'hold_not_found') return err(404, 'hold_not_found', m);
           if (m === 'hold_already_settled') return err(409, 'hold_already_settled', m);
           console.error('CreditDO debit unexpected:', e);
-          return err(500, 'bad_request', 'internal error');
+          return err(500, 'internal_error', 'internal error');
         }
       }
       if (url.pathname === '/api/billing/credit/refund' && req.method === 'POST') {
@@ -87,10 +87,10 @@ export class CreditDO extends DurableObject<Env> {
           const m = (e as Error).message;
           if (m === 'hold_already_settled') return err(409, 'hold_already_settled', m);
           console.error('CreditDO refund unexpected:', e);
-          return err(500, 'bad_request', 'internal error');
+          return err(500, 'internal_error', 'internal error');
         }
       }
-      return err(404, 'bad_request', 'unknown op');
+      return err(404, 'not_found', 'unknown op');
     });
   }
 }

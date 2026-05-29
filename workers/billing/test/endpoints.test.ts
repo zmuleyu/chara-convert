@@ -88,4 +88,27 @@ describe('credit endpoints', () => {
     const body = await r.json<{ aiUsed: number; aiCap: number; tier: string }>();
     expect(body.aiCap).toBe(5);
   });
+
+  // A.1.x-M1: error envelope code field must distinguish caller-error (4xx)
+  // from transient/server-error (5xx) so credit_client.py can apply different
+  // retry policy. See workers/billing/src/types.ts for code-→-semantics map.
+  it('unknown credit subpath inside DO returns 404 not_found (not bad_request)', async () => {
+    const r = await call('/api/billing/credit/bogus', { method: 'POST', userId: 'u-z', body: '{}' });
+    expect(r.status).toBe(404);
+    expect(await r.json()).toMatchObject({ code: 'not_found' });
+  });
+
+  it('malformed JSON body returns 400 bad_request', async () => {
+    const r = await call('/api/billing/credit/hold', { method: 'POST', userId: 'u-z', body: 'not-json' });
+    expect(r.status).toBe(400);
+    expect(await r.json()).toMatchObject({ code: 'bad_request' });
+  });
+
+  it('hold with non-numeric amount returns 400 bad_request', async () => {
+    const r = await call('/api/billing/credit/hold', {
+      method: 'POST', userId: 'u-z', body: JSON.stringify({ amount: 'cheap' }),
+    });
+    expect(r.status).toBe(400);
+    expect(await r.json()).toMatchObject({ code: 'bad_request' });
+  });
 });
