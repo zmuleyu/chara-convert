@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from chara_convert.ai.enrich import build_field_prompt
 from chara_convert.llm.factory import build_ai_client_or_none
 from chara_convert.llm.mock import MockLLMClient
+from dataclasses import fields
 from chara_convert.normalizer import NormalizedCard
 
 router = APIRouter()
@@ -61,6 +62,11 @@ async def enrich(body: EnrichRequest):
     """Stream AI-enriched text for a single card field."""
     if body.field not in ALLOWED_FIELDS:
         raise HTTPException(status_code=422, detail="unsupported field")
-    card = NormalizedCard(**body.card)
+    known = {f.name for f in fields(NormalizedCard)}
+    safe = {k: v for k, v in body.card.items() if k in known}
+    # Frontend may use first_message; NormalizedCard uses first_mes.
+    if 'first_message' in body.card and 'first_mes' not in safe:
+        safe['first_mes'] = body.card['first_message']
+    card = NormalizedCard(**safe)
     prompt = build_field_prompt(card, body.field)
     return StreamingResponse(_stream(prompt), media_type="text/event-stream")
