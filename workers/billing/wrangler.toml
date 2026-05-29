@@ -6,3 +6,13 @@ compatibility_date = "2026-05-28"
 binding = "RATE_LIMIT_KV"
 id = "b240216870df41b5998eb183822757ee"
 preview_id = "251c98eaa1f940f5a416460c0d74650a"
+
+[[d1_databases]]
+binding = "CREDIT_DB"
+database_name = "chara-convert-credit"
+database_id = "REPLACE_AFTER_CREATE"
+preview_database_id = "REPLACE_AFTER_CREATE_PREVIEW"
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["*/10 * * * *"]
