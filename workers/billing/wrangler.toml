@@ -15,5 +15,13 @@ database_id = "REPLACE_AFTER_CREATE"
 preview_database_id = "REPLACE_AFTER_CREATE_PREVIEW"
 migrations_dir = "migrations"
 
+[[durable_objects.bindings]]
+name = "CREDIT_DO"
+class_name = "CreditDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["CreditDO"]
+
 [triggers]
 crons = ["*/10 * * * *"]
