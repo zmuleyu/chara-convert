@@ -8,7 +8,24 @@ on:
     paths:
       - 'workers/**'
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      billing-exists: ${{ steps.check.outputs.billing-exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f workers/billing/package-lock.json ]; then
+            echo "billing-exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "billing-exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::workers/billing/ not present on this branch; skipping billing jobs."
+          fi
+
   billing-typecheck:
+    needs: guard
+    if: needs.guard.outputs.billing-exists == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +42,8 @@ jobs:
         run: npx tsc --noEmit
 
   deploy-billing:
-    needs: billing-typecheck
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    needs: [guard, billing-typecheck]
+    if: needs.guard.outputs.billing-exists == 'true' && github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: production-billing
