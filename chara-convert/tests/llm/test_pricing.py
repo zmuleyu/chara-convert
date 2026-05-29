@@ -27,7 +27,7 @@ def test_pricing_table_invariant_primary_eq_first_fallback():
     """
     required = {
         "deepseek/deepseek-chat", "moonshotai/kimi-k2",
-        "anthropic/claude-3.5-sonnet", "openai/gpt-4o",
+        "anthropic/claude-sonnet-4.6", "openai/gpt-4o",
     }
     covered: set[str] = set()
     for cls_table in PRICING_TABLE.values():

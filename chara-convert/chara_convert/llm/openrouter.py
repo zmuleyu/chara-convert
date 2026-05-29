@@ -25,14 +25,16 @@ ModelClass = Literal["low", "high"]
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Mirrors spec Model config (frozen). primary == fallback[0] is invariant.
+# Slugs must exist in OR's live list — pricing.py PRICING_TABLE and the
+# scripts/pricing_drift_check.py drift guard both pivot on these strings.
 MODEL_BY_CLASS: dict[ModelClass, dict[str, Any]] = {
     "low": {
         "primary": "deepseek/deepseek-chat",
         "fallback": ["deepseek/deepseek-chat", "moonshotai/kimi-k2"],
     },
     "high": {
-        "primary": "anthropic/claude-3.5-sonnet",
-        "fallback": ["anthropic/claude-3.5-sonnet", "openai/gpt-4o"],
+        "primary": "anthropic/claude-sonnet-4.6",
+        "fallback": ["anthropic/claude-sonnet-4.6", "openai/gpt-4o"],
     },
 }
 

@@ -14,14 +14,22 @@ USD_PER_CREDIT: float = 0.0001
 
 # USD per 1M tokens, seeded from OR list 2026-05-29. worst_case row is used for
 # hold sizing -- must be >= every actual provider row in the same class.
+#
+# 2026-05-29 refresh notes:
+#   - high: claude-3.5-sonnet retired from OR; replaced with claude-sonnet-4.6
+#     (same $3/$15 pricing tier). MODEL_BY_CLASS in openrouter.py updated to match.
+#   - low/deepseek-chat: OR raised prices to $0.229/$0.914 (was $0.14/$0.28 seed).
+#   - low/kimi-k2: now $0.57/$2.30 on OR (small drop from old $0.60/$2.50 seed).
+#     worst_case kept at $0.60/$2.50 for ~5-8% headroom against intra-month OR
+#     markup changes; drift_check at 20% catches anything larger.
 PRICING_TABLE: dict[ModelClass, dict[str, dict[str, float]]] = {
     "low": {
-        "deepseek/deepseek-chat": {"input": 0.14, "output": 0.28},
-        "moonshotai/kimi-k2":     {"input": 0.60, "output": 2.50},
+        "deepseek/deepseek-chat": {"input": 0.229, "output": 0.914},
+        "moonshotai/kimi-k2":     {"input": 0.57, "output": 2.30},
         "worst_case":             {"input": 0.60, "output": 2.50},
     },
     "high": {
-        "anthropic/claude-3.5-sonnet": {"input": 3.00, "output": 15.00},
+        "anthropic/claude-sonnet-4.6": {"input": 3.00, "output": 15.00},
         "openai/gpt-4o":               {"input": 2.50, "output": 10.00},
         "worst_case":                  {"input": 3.00, "output": 15.00},
     },

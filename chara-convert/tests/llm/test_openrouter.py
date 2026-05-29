@@ -47,7 +47,7 @@ def test_complete_high_class_uses_claude_primary():
         _client_factory=lambda **_: fake,
     )
     c.complete("hi")
-    assert fake.calls[0]["model"] == "anthropic/claude-3.5-sonnet"
+    assert fake.calls[0]["model"] == "anthropic/claude-sonnet-4.6"
 
 
 def test_missing_api_key_raises(monkeypatch):
