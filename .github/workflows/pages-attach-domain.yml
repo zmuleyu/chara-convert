@@ -108,6 +108,7 @@ jobs:
 
       - name: Verify HTTPS (up to 5 min for SSL provisioning)
         run: |
+          set +e
           url="https://$DOMAIN$VERIFY_PATH"
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
