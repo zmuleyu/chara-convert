@@ -79,9 +79,28 @@ jobs:
         working-directory: apps/web
         run: npx -y @lhci/cli autorun --config=./lighthouserc.json || true
 
-  deploy-pages:
+  preflight-deploy:
     needs: build-and-test
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      has-secrets: ${{ steps.check.outputs.has-secrets }}
+    steps:
+      - id: check
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CF_API_TOKEN" ] && [ -n "$CF_ACCOUNT_ID" ]; then
+            echo "has-secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CF_API_TOKEN or CF_ACCOUNT_ID not configured; skipping Cloudflare Pages deploy."
+          fi
+
+  deploy-pages:
+    needs: [build-and-test, preflight-deploy]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && needs.preflight-deploy.outputs.has-secrets == 'true'
     runs-on: ubuntu-latest
     environment:
       name: production-web

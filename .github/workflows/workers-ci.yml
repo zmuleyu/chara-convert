@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       billing-exists: ${{ steps.check.outputs.billing-exists }}
+      has-secrets: ${{ steps.secrets.outputs.has-secrets }}
     steps:
       - uses: actions/checkout@v4
       - id: check
@@ -21,6 +22,17 @@ jobs:
           else
             echo "billing-exists=false" >> "$GITHUB_OUTPUT"
             echo "::notice::workers/billing/ not present on this branch; skipping billing jobs."
+          fi
+      - id: secrets
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CF_API_TOKEN" ] && [ -n "$CF_ACCOUNT_ID" ]; then
+            echo "has-secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CF_API_TOKEN or CF_ACCOUNT_ID not configured; skipping deploy-billing."
           fi
 
   billing-typecheck:
@@ -43,7 +55,7 @@ jobs:
 
   deploy-billing:
     needs: [guard, billing-typecheck]
-    if: needs.guard.outputs.billing-exists == 'true' && github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: needs.guard.outputs.billing-exists == 'true' && needs.guard.outputs.has-secrets == 'true' && github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: production-billing
