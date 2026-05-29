@@ -15,10 +15,16 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.toml' },
+        // singleWorker:true + isolatedStorage:false → one isolate, no per-test
+        // snapshot/restore → avoids Windows EBUSY on the DO storage file lock.
+        // applyMigration DROPs tables first to keep each beforeEach deterministic.
+        singleWorker: true,
+        isolatedStorage: false,
         miniflare: {
           d1Databases: ['CREDIT_DB'],
           d1Persist: false,
           kvNamespaces: ['RATE_LIMIT_KV'],
+          durableObjectsPersist: false,
         },
       },
     },
