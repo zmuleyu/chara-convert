@@ -1,3 +1,10 @@
+// DORMANT 2026-05-29: pure-credit pivot drops subscription tiers as a routing
+// input. This file is intentionally retained — see
+// docs/specs/2026-05-29-or-credit-router-design.md §Key trade-offs and the
+// rollout plan in docs/plans/2026-05-29-or-credit-router-plan-C-rollout.md for
+// the conditions under which we'd re-import these constants (Creem cutover
+// 2026-10 may re-introduce subscription tiers as a credit-grant ladder).
+//
 export type TierId = 'free' | 'creator' | 'studio';
 
 export interface Tier {
