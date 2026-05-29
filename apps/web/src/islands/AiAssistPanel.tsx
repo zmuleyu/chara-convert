@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '~/lib/store';
 import { useBilling } from '~/lib/billing/client';
 import { getOrCreateUserId } from '~/lib/billing/userId';
-import UpgradeCTA from './UpgradeCTA';
+import LowCreditCTA from './LowCreditCTA';
 
 interface Props { field: string; onClose: () => void }
 
@@ -105,7 +105,7 @@ export default function AiAssistPanel({ field, onClose }: Props) {
         className="px-3 py-1 bg-slate-900 text-white rounded text-sm disabled:opacity-40">
         {quotaHit ? 'Quota reached' : status === 'streaming' ? 'Streaming…' : status === 'done' ? 'Regenerate' : 'Generate'}
       </button>
-      {quotaHit && <UpgradeCTA />}
+      {quotaHit && <LowCreditCTA />}
       <pre className="whitespace-pre-wrap text-sm border rounded p-2 min-h-32 bg-slate-50">{text}</pre>
       {status === 'error' && errorInfo.kind === 'insufficient_credit' && (
         <div className="text-sm text-amber-700 border border-amber-300 bg-amber-50 rounded p-2">
