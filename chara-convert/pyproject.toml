@@ -46,3 +46,6 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[tool.pytest.ini_options]
+markers = ["live_smoke: hits live OR API; gated by RUN_OR_SMOKE=1"]
