@@ -94,12 +94,12 @@ const fields = [
 
   <details class="mt-4 border rounded p-4">
     <summary class="font-medium cursor-pointer">Is my card data stored anywhere?</summary>
-    <p class="mt-3 text-sm text-slate-700">No. Free-tier sessions stay in your browser (IndexedDB). The FastAPI shim is stateless — it never persists what you paste or upload. Cloud storage ships only when you upgrade to Creator (October 2026).</p>
+    <p class="mt-3 text-sm text-slate-700">No. Sessions stay in your browser (IndexedDB). The FastAPI shim is stateless — it never persists what you paste or upload. Self-serve cloud storage ships alongside the Creem checkout in October 2026.</p>
   </details>
 
   <details class="mt-3 border rounded p-4">
-    <summary class="font-medium cursor-pointer">What does Free include?</summary>
-    <p class="mt-3 text-sm text-slate-700">All parsing, all targets, .md export, and 5 AI Assist calls per day. See <a href={`${base}pricing`} class="underline">pricing</a>.</p>
+    <summary class="font-medium cursor-pointer">How am I billed for AI assist?</summary>
+    <p class="mt-3 text-sm text-slate-700">Per request, in credits — 1 credit ≈ $0.0001. The router picks the cheapest model class your balance can afford: lower-cost open models if you're tight on credit, higher-quality models when you have more. See <a href={`${base}pricing`} class="underline">pricing</a> for top-up status.</p>
   </details>
 
   <details class="mt-3 border rounded p-4">
