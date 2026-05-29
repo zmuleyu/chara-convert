@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '~/lib/store';
+import AiAssistPanel from './AiAssistPanel';
 
 interface Props { field: string }
 
@@ -11,6 +12,7 @@ export default function FieldCard({ field }: Props) {
   const setOverride = useStore((s) => s.setOverride);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [aiOpen, setAiOpen] = useState(false);
 
   function save() {
     setOverride(field, draft);
@@ -27,6 +29,7 @@ export default function FieldCard({ field }: Props) {
         <h3 className="font-medium capitalize">{field.replace(/_/g, ' ')}</h3>
         <div className="opacity-0 group-hover:opacity-100 flex gap-2">
           <button type="button" className="text-xs underline" onClick={copy}>Copy</button>
+          <button type="button" className="text-xs underline" onClick={() => setAiOpen(true)}>AI</button>
           {!editing && (
             <button type="button" className="text-xs underline" onClick={() => { setDraft(value); setEditing(true); }}>
               Edit
@@ -48,6 +51,9 @@ export default function FieldCard({ field }: Props) {
         </>
       ) : (
         <p className="text-sm whitespace-pre-wrap text-slate-700">{value || <i className="text-slate-400">(empty)</i>}</p>
+      )}
+      {aiOpen && (
+        <AiAssistPanel field={field} onClose={() => setAiOpen(false)} />
       )}
     </article>
   );
