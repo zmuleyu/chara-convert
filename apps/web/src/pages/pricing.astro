@@ -1,34 +1,27 @@
 ---
 import BaseLayout from '~/layouts/BaseLayout.astro';
-import { TIERS } from '~/lib/billing/tiers';
-
-const tiers = [TIERS.free, TIERS.creator, TIERS.studio];
-const base = import.meta.env.BASE_URL;
-const checkoutHref = (id: string) => `${base}api/billing/checkout?plan=${id}`;
 ---
 
 <BaseLayout title="Pricing">
   <h1 class="text-3xl font-bold">Pricing</h1>
-  <p class="mt-2 text-slate-600">v0 — Creeem checkout activates October 2026.</p>
-  
-  <div class="mt-8 grid md:grid-cols-3 gap-4">
-    {tiers.map((t) => (
-      <div class="border rounded p-6 space-y-3">
-        <h2 class="text-xl font-semibold">{t.name}</h2>
-        <p class="text-3xl font-bold">
-          ${t.priceUsdMonth}<span class="text-base font-normal text-slate-500">/mo</span>
-        </p>
-        <ul class="text-sm space-y-1">
-          <li>AI calls/day: <b>{t.aiCapPerDay < 0 ? 'unlimited' : t.aiCapPerDay}</b></li>
-          <li>Export: <b>{t.exportFormats.join(', ')}</b></li>
-          <li>Storage: <b>{t.storage}</b></li>
-        </ul>
-        {t.id === 'free'
-          ? <span class="block px-3 py-2 text-center text-sm border rounded">Current</span>
-          : <a href={checkoutHref(t.id)} class="block px-3 py-2 text-center bg-slate-900 text-white rounded text-sm">
-              Upgrade (501 stub)
-            </a>}
-      </div>
-    ))}
+  <p class="mt-2 text-slate-600">
+    chara-convert runs on a per-request credit model — no monthly tiers.
+  </p>
+
+  <div class="mt-8 border rounded p-6 space-y-3 bg-slate-50">
+    <h2 class="text-xl font-semibold">Credit top-up — coming soon</h2>
+    <p class="text-sm text-slate-700">
+      Self-serve credit purchase ships with the Creem checkout integration in
+      October 2026. In the meantime, contact
+      <a href="https://github.com/zmuleyu/chara-convert/issues/new" class="underline">
+        the team
+      </a>
+      for early access credits.
+    </p>
+    <p class="text-xs text-slate-500">
+      Credits are spent per AI request based on the model that handled it —
+      lower-cost open models when you have less credit, higher-quality models
+      when you have more. 1 credit ≈ $0.0001.
+    </p>
   </div>
 </BaseLayout>
