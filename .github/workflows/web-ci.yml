@@ -14,8 +14,6 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    outputs:
-      web-built: ${{ steps.web-build.outputs.built }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,22 +38,9 @@ jobs:
       - name: Vitest
         working-directory: apps/web
         run: npm test
-      - name: Build
-        id: web-build
+      - name: Build (E2E-friendly, no env override)
         working-directory: apps/web
-        env:
-          PUBLIC_API_BASE: ${{ vars.PUBLIC_API_BASE || 'https://chara-convert-shim.fly.dev' }}
-          PUBLIC_BILLING_BASE: ${{ vars.PUBLIC_BILLING_BASE || 'https://chara-convert-billing.workers.dev' }}
-        run: |
-          npm run build
-          echo "built=true" >> "$GITHUB_OUTPUT"
-      - name: Upload web dist for deploy job
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: apps/web/dist
-          retention-days: 1
+        run: npm run build
       - name: Playwright browser
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
@@ -102,16 +87,27 @@ jobs:
       name: production-web
       url: https://studio.aichathub.uk/chara-convert/
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: web-dist
-          path: dist
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci
+      - name: Build with production env
+        working-directory: apps/web
+        env:
+          PUBLIC_API_BASE: ${{ vars.PUBLIC_API_BASE || 'https://chara-convert-shim.fly.dev' }}
+          PUBLIC_BILLING_BASE: ${{ vars.PUBLIC_BILLING_BASE || 'https://chara-convert-billing.workers.dev' }}
+        run: npm run build
       - name: Cloudflare Pages deploy
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           projectName: chara-convert-web
-          directory: dist
+          directory: apps/web/dist
           branch: master
           wranglerVersion: '3'
