@@ -2,11 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AiAssistPanel from '../AiAssistPanel';
 import { useStore } from '~/lib/store';
-import { _resetUserIdForTests } from '~/lib/billing/userId';
-
-function billingResponse(body: unknown = { tier: 'free', aiUsed: 0, aiCap: 5 }): Response {
-  return new Response(JSON.stringify(body), { status: 200 });
-}
+import * as billing from '~/lib/billing/client';
 
 function sseResponse(): Response {
   const encoder = new TextEncoder();
@@ -20,22 +16,48 @@ function sseResponse(): Response {
   return new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } });
 }
 
-function urlMockedFetch(billing: Response, sse: Response) {
-  return vi.fn().mockImplementation((url: string) => {
-    if (typeof url === 'string' && url.includes('/api/billing/quota')) {
-      return Promise.resolve(billing);
-    }
-    return Promise.resolve(sse);
+function stubBilling(overrides: Partial<billing.BillingState> = {}) {
+  vi.spyOn(billing, 'useBilling').mockReturnValue({
+    balance: 5000, held: 0, loaded: true, userId: 'u-test',
+    ...overrides,
   });
 }
 
-beforeEach(() => _resetUserIdForTests());
+beforeEach(() => {
+  vi.restoreAllMocks();
+  useStore.getState().reset();
+});
 
-describe('AiAssistPanel', () => {
+describe('AiAssistPanel — balance gate', () => {
+  it('renders Generate enabled when balance >= MIN_BALANCE_TO_TRY', () => {
+    stubBilling({ balance: 5000 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse()));
+    render(<AiAssistPanel field="personality" onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: /Generate/i })).toBeEnabled();
+  });
+
+  it('disables button + shows "Low credit" when balance < MIN_BALANCE_TO_TRY', () => {
+    stubBilling({ balance: 50 });
+    render(<AiAssistPanel field="personality" onClose={() => {}} />);
+    const btn = screen.getByRole('button', { name: /Low credit/i });
+    expect(btn).toBeDisabled();
+    // LowCreditCTA banner should render alongside
+    expect(screen.getByText(/Top-up your account/i)).toBeInTheDocument();
+  });
+
+  it('disables button + shows "Loading…" while balance is unloaded (no UX flicker)', () => {
+    stubBilling({ balance: 0, loaded: false });
+    render(<AiAssistPanel field="personality" onClose={() => {}} />);
+    const btn = screen.getByRole('button', { name: /Loading…/i });
+    expect(btn).toBeDisabled();
+  });
+});
+
+describe('AiAssistPanel — streaming + accept', () => {
   it('streams tokens via SSE and accept writes override', async () => {
-    useStore.getState().reset();
+    stubBilling();
     useStore.getState().setCard({ name: 'Aerin' });
-    vi.stubGlobal('fetch', urlMockedFetch(billingResponse(), sseResponse()));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse()));
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
     await waitFor(() => expect(screen.getByText(/calm/)).toBeInTheDocument());
@@ -44,32 +66,20 @@ describe('AiAssistPanel', () => {
   });
 
   it('Reject closes without writing override', () => {
-    useStore.getState().reset();
-    vi.stubGlobal('fetch', urlMockedFetch(billingResponse(), sseResponse()));
+    stubBilling();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse()));
     const onClose = vi.fn();
     render(<AiAssistPanel field="personality" onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /reject/i }));
     expect(onClose).toHaveBeenCalled();
     expect(useStore.getState().overrides.personality).toBeUndefined();
   });
+});
 
-  it('disables Generate when free quota exhausted', async () => {
-    useStore.getState().reset();
-    vi.stubGlobal(
-      'fetch',
-      urlMockedFetch(billingResponse({ tier: 'free', aiUsed: 5, aiCap: 5 }), sseResponse()),
-    );
-    render(<AiAssistPanel field="personality" onClose={() => {}} />);
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /quota reached/i })).toBeDisabled(),
-    );
-  });
-
-  // Phase C: BYOK user id + OR error envelope handling
-
-  it('sends X-User-Id header on /ai/enrich (BYOK identifier)', async () => {
-    useStore.getState().reset();
-    const fetchMock = urlMockedFetch(billingResponse(), sseResponse());
+describe('AiAssistPanel — BYOK header + OR error envelope (5fad6c8 preserved)', () => {
+  it('sends X-User-Id from billing.userId (not raw localStorage)', async () => {
+    stubBilling({ userId: 'u-xyz' });
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
@@ -80,39 +90,35 @@ describe('AiAssistPanel', () => {
     );
     expect(enrichCall).toBeDefined();
     const headers = (enrichCall![1] as RequestInit).headers as Record<string, string>;
-    expect(headers['X-User-Id']).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(headers['X-User-Id']).toBe('u-xyz');
   });
 
   it('shows insufficient_credit UI on 402 JSON envelope', async () => {
-    useStore.getState().reset();
+    stubBilling();
     const err = new Response(
       JSON.stringify({ code: 'insufficient_credit', message: 'balance < amount' }),
       { status: 402, headers: { 'content-type': 'application/json' } },
     );
-    vi.stubGlobal('fetch', urlMockedFetch(billingResponse(), err));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(err));
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
     await waitFor(() => expect(screen.getByText(/out of credits/i)).toBeInTheDocument());
-    // Top-up CTA is intentionally deferred until /api/billing/checkout returns
-    // 200 (Creem cutover Oct 2026); for now just verify the message renders.
   });
 
   it('shows service_unavailable UI on 503 JSON envelope', async () => {
-    useStore.getState().reset();
+    stubBilling();
     const err = new Response(
       JSON.stringify({ code: 'service_unavailable', message: 'x' }),
       { status: 503, headers: { 'content-type': 'application/json' } },
     );
-    vi.stubGlobal('fetch', urlMockedFetch(billingResponse(), err));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(err));
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
     await waitFor(() => expect(screen.getByText(/temporarily down/i)).toBeInTheDocument());
   });
 
   it('surfaces mid-stream error frame from SSE', async () => {
-    useStore.getState().reset();
+    stubBilling();
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(ctl) {
@@ -122,7 +128,7 @@ describe('AiAssistPanel', () => {
       },
     });
     const sse = new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } });
-    vi.stubGlobal('fetch', urlMockedFetch(billingResponse(), sse));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sse));
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate/i }));
     await waitFor(() => expect(screen.getByText(/upstream timeout/i)).toBeInTheDocument());
