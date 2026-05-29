@@ -18,6 +18,7 @@ export default defineWorkersConfig({
         miniflare: {
           d1Databases: ['CREDIT_DB'],
           d1Persist: false,
+          kvNamespaces: ['RATE_LIMIT_KV'],
         },
       },
     },
