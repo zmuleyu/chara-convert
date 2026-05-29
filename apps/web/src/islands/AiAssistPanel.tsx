@@ -1,11 +1,28 @@
 import { useState } from 'react';
 import { useStore } from '~/lib/store';
 import { useBilling } from '~/lib/billing/client';
+import { getOrCreateUserId } from '~/lib/billing/userId';
 import UpgradeCTA from './UpgradeCTA';
 
 interface Props { field: string; onClose: () => void }
 
 const BASE = (import.meta.env.PUBLIC_API_BASE as string | undefined) ?? 'http://localhost:8000';
+
+type ErrorKind =
+  | { kind: 'none' }
+  | { kind: 'insufficient_credit'; message: string }
+  | { kind: 'service_unavailable'; message: string }
+  | { kind: 'generic'; message: string };
+
+function describeError(code: string | undefined, fallback: string): ErrorKind {
+  if (code === 'insufficient_credit') {
+    return { kind: 'insufficient_credit', message: 'Out of credits. Top up to keep going.' };
+  }
+  if (code === 'service_unavailable' || code === 'internal_error') {
+    return { kind: 'service_unavailable', message: 'Billing service is temporarily down. Try again in a moment.' };
+  }
+  return { kind: 'generic', message: fallback };
+}
 
 export default function AiAssistPanel({ field, onClose }: Props) {
   const card = useStore((s) => ({ ...(s.sourceCard ?? {}), ...(s.converted ?? {}), ...s.overrides }));
@@ -14,16 +31,30 @@ export default function AiAssistPanel({ field, onClose }: Props) {
   const quotaHit = billing.aiCap >= 0 && billing.aiUsed >= billing.aiCap;
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'streaming' | 'done' | 'error'>('idle');
+  const [errorInfo, setErrorInfo] = useState<ErrorKind>({ kind: 'none' });
 
   async function generate() {
-    setText(''); setStatus('streaming');
+    setText(''); setStatus('streaming'); setErrorInfo({ kind: 'none' });
     try {
       const res = await fetch(`${BASE}/api/ai/enrich`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': getOrCreateUserId(),
+        },
         body: JSON.stringify({ card, field }),
       });
-      if (!res.ok || !res.body) throw new Error(`${res.status}`);
+
+      // Pre-stream error envelope (FastAPI returns JSONResponse before opening SSE)
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok && contentType.includes('application/json')) {
+        const body = await res.json().catch(() => ({}));
+        setErrorInfo(describeError(body.code, body.message ?? `HTTP ${res.status}`));
+        setStatus('error');
+        return;
+      }
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = '';
@@ -35,11 +66,26 @@ export default function AiAssistPanel({ field, onClose }: Props) {
         buf = events.pop() ?? '';
         for (const ev of events) {
           const m = ev.match(/^data:\s?(.*)$/m);
-          if (m) setText((prev) => prev + m[1]);
+          if (!m) continue;
+          const data = m[1];
+          // Mid-stream error frame from ai_enrich.py: {"event":"error","code":...,"message":...}
+          if (data.startsWith('{') && data.includes('"event"')) {
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.event === 'error') {
+                setErrorInfo(describeError(parsed.code, parsed.message ?? 'Stream failed.'));
+                setStatus('error');
+                return;
+              }
+            } catch { /* not a JSON event, fall through to content append */ }
+          }
+          if (data === '[DONE]') continue;
+          setText((prev) => prev + data);
         }
       }
       setStatus('done');
-    } catch {
+    } catch (e) {
+      setErrorInfo({ kind: 'generic', message: (e as Error).message || 'Stream failed.' });
       setStatus('error');
     }
   }
@@ -61,7 +107,20 @@ export default function AiAssistPanel({ field, onClose }: Props) {
       </button>
       {quotaHit && <UpgradeCTA />}
       <pre className="whitespace-pre-wrap text-sm border rounded p-2 min-h-32 bg-slate-50">{text}</pre>
-      {status === 'error' && <p className="text-sm text-red-600">Stream failed. Try again.</p>}
+      {status === 'error' && errorInfo.kind === 'insufficient_credit' && (
+        <div className="text-sm text-amber-700 border border-amber-300 bg-amber-50 rounded p-2">
+          {/* Top-up flow lives behind the Creem cutover (Oct 2026); for now we
+              just inform — a "Top up credits" CTA goes here once /api/billing/
+              checkout returns 200 instead of 501. */}
+          {errorInfo.message}
+        </div>
+      )}
+      {status === 'error' && errorInfo.kind === 'service_unavailable' && (
+        <p className="text-sm text-amber-700">{errorInfo.message}</p>
+      )}
+      {status === 'error' && errorInfo.kind === 'generic' && (
+        <p className="text-sm text-red-600">{errorInfo.message}</p>
+      )}
       <div className="flex gap-2">
         <button type="button" disabled={!text} onClick={accept}
           className="px-3 py-1 bg-emerald-600 text-white rounded text-sm disabled:opacity-40">

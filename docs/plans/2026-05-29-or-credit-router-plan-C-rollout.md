@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Status snapshot — 2026-05-29
+
+**Forward-compat slice landed** (commit pending): `apps/web/src/lib/billing/userId.ts` (localStorage-backed v4 UUID, the "BYOK identifier"), `AiAssistPanel` sends `X-User-Id` on `/ai/enrich` and renders dedicated UI for `insufficient_credit` / `service_unavailable` (4xx JSON envelope) and mid-stream error frames. Vitest 33/33 green; `astro check` 0/0/0. Legacy `LLM_ROUTER_MODE=legacy` path unchanged — server ignores the new header.
+
+**Blocked on D1 provisioning** (Tasks 1, 1.5, 2, 2.5, 2.6 full balance-based migration; Tasks 6, 7 deploy): rewriting `useBilling` to poll `/credit/balance` would replace the working free-quota UX (`tier/aiCap/aiUsed`) with a "balance=0, can't try" UX until credits are seeded. Defer until `workers/billing/wrangler.toml` has real `database_id` + `preview_database_id` and a seed grant can land for staging-tester accounts. Tasks 3 (BYOK runbook), 4 (rollout runbook), 5 (`fly.toml` env vars) can be authored independently and should land alongside the deploy session, not pre-emptively (text would speculate without a verified-once anchor).
+
 **Goal:** Replace the web client's `useBilling` hook with credit-balance polling, write the BYOK runbook, deploy + flip the feature flag in staging then prod.
 
 **Architecture:** A single React hook change (`useBilling` → `{balance, held}` instead of `{tier, aiUsed, aiCap}`), the existing `tiers.ts` file kept dormant for the post-Creem subscription re-enable, a CF Worker deploy, two runbook docs, and a controlled staging→prod feature-flag flip.
