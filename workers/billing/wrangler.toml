@@ -1,6 +1,7 @@
 name = "chara-convert-billing"
 main = "src/index.ts"
 compatibility_date = "2026-05-28"
+compatibility_flags = ["nodejs_compat"]
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
