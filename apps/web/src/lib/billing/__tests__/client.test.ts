@@ -58,14 +58,26 @@ describe('useBilling (credit)', () => {
     expect(headers['X-User-Id']).toBe(result.current.userId);
   });
 
-  it('falls back to balance=0/held=0/loaded=true on fetch failure', async () => {
+  it('falls back to balance=0/held=0/loaded=true/available=false on fetch failure', async () => {
     localStorage.setItem('chara-convert-user-id', 'u-test');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
 
     const { result } = renderHook(() => useBilling());
     await waitFor(() => expect(result.current.loaded).toBe(true));
+    // available=false is the signal consumers use to fail-open the balance
+    // gate (legacy mode / worker not deployed).
     expect(result.current).toMatchObject({
-      balance: 0, held: 0, userId: 'u-test',
+      balance: 0, held: 0, userId: 'u-test', available: false,
     });
+  });
+
+  it('reports available=true on a successful fetch', async () => {
+    localStorage.setItem('chara-convert-user-id', 'u-test');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ balance: 100, held: 0 }),
+    }));
+    const { result } = renderHook(() => useBilling());
+    await waitFor(() => expect(result.current.available).toBe(true));
   });
 });

@@ -18,7 +18,7 @@ function sseResponse(): Response {
 
 function stubBilling(overrides: Partial<billing.BillingState> = {}) {
   vi.spyOn(billing, 'useBilling').mockReturnValue({
-    balance: 5000, held: 0, loaded: true, userId: 'u-test',
+    balance: 5000, held: 0, loaded: true, userId: 'u-test', available: true,
     ...overrides,
   });
 }
@@ -46,10 +46,20 @@ describe('AiAssistPanel — balance gate', () => {
   });
 
   it('disables button + shows "Loading…" while balance is unloaded (no UX flicker)', () => {
-    stubBilling({ balance: 0, loaded: false });
+    stubBilling({ balance: 0, loaded: false, available: false });
     render(<AiAssistPanel field="personality" onClose={() => {}} />);
     const btn = screen.getByRole('button', { name: /Loading…/i });
     expect(btn).toBeDisabled();
+  });
+
+  it('fails open when billing worker is unavailable (legacy mode)', () => {
+    // Loaded but unavailable + balance=0 — must NOT show "Low credit".
+    // Legacy LLM_ROUTER_MODE has no credit lifecycle on the server, so
+    // gating the UI here would break the entire legacy E2E.
+    stubBilling({ balance: 0, loaded: true, available: false });
+    render(<AiAssistPanel field="personality" onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: /Generate/i })).toBeEnabled();
+    expect(screen.queryByText(/Low credit/i)).not.toBeInTheDocument();
   });
 });
 

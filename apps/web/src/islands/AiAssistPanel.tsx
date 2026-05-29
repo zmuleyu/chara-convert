@@ -28,7 +28,9 @@ export default function AiAssistPanel({ field, onClose }: Props) {
   const card = useStore((s) => ({ ...(s.sourceCard ?? {}), ...(s.converted ?? {}), ...s.overrides }));
   const setOverride = useStore((s) => s.setOverride);
   const billing = useBilling();
-  const lowCredit = billing.loaded && billing.balance < MIN_BALANCE_TO_TRY;
+  // Fail-open when the billing worker is unreachable — legacy mode (no worker
+  // deployed, no LLM_ROUTER_MODE=or) must not be gated by a phantom balance.
+  const lowCredit = billing.loaded && billing.available && billing.balance < MIN_BALANCE_TO_TRY;
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'streaming' | 'done' | 'error'>('idle');
   const [errorInfo, setErrorInfo] = useState<ErrorKind>({ kind: 'none' });
