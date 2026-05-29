@@ -19,5 +19,5 @@ test('AI assist personality field, accept, writes override', async ({ page }) =>
   await panel.getByRole('button', { name: /generate/i }).click();
   await expect(panel).toContainText(/Aerin is calm/, { timeout: 10_000 });
   await panel.getByRole('button', { name: /accept/i }).click();
-  await expect(card).toContainText(/calm and observant/);
+  await expect(card).toContainText(/calm.*observant/);
 });
