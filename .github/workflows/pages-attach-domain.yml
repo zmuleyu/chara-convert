@@ -1,0 +1,127 @@
+name: pages-attach-domain
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Custom domain to attach (FQDN)'
+        default: studio.aichathub.uk
+        required: true
+      project:
+        description: 'Cloudflare Pages project name'
+        default: chara-convert-web
+        required: true
+      zone:
+        description: 'Cloudflare DNS zone (apex)'
+        default: aichathub.uk
+        required: true
+      verify_path:
+        description: 'Path to probe after attach (SPA base)'
+        default: /chara-convert/
+        required: true
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      DOMAIN: ${{ inputs.domain }}
+      PROJECT: ${{ inputs.project }}
+      ZONE: ${{ inputs.zone }}
+      VERIFY_PATH: ${{ inputs.verify_path }}
+    steps:
+      - name: Preflight (token + account reachable)
+        run: |
+          set -e
+          test -n "$CF_API_TOKEN" || { echo "::error::CF_API_TOKEN missing"; exit 1; }
+          test -n "$CF_ACCOUNT_ID" || { echo "::error::CF_ACCOUNT_ID missing"; exit 1; }
+          name=$(curl -sf -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID" \
+            | jq -r '.result.name')
+          echo "account: $name"
+
+      - name: Attach domain to Pages project (idempotent)
+        run: |
+          set -e
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$PROJECT/domains"
+          existing=$(curl -sf -H "Authorization: Bearer $CF_API_TOKEN" "$api" \
+            | jq -r --arg d "$DOMAIN" '.result[] | select(.name==$d) | .name')
+          if [ "$existing" = "$DOMAIN" ]; then
+            echo "::notice::domain $DOMAIN already attached to $PROJECT"
+          else
+            echo "attaching $DOMAIN to $PROJECT ..."
+            resp=$(curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -X POST "$api" -d "{\"name\":\"$DOMAIN\"}")
+            success=$(echo "$resp" | jq -r '.success')
+            if [ "$success" != "true" ]; then
+              echo "::error::attach failed:"
+              echo "$resp" | jq '.errors'
+              exit 1
+            fi
+            echo "$resp" | jq '.result | {name, status, certificate_authority}'
+          fi
+
+      - name: Ensure DNS CNAME (best-effort; needs Zone:DNS:Edit)
+        continue-on-error: true
+        id: dns
+        run: |
+          set +e
+          zone_resp=$(curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$ZONE")
+          zone_success=$(echo "$zone_resp" | jq -r '.success')
+          if [ "$zone_success" != "true" ]; then
+            echo "::warning::zone lookup failed (token likely lacks Zone:Read on $ZONE):"
+            echo "$zone_resp" | jq '.errors'
+            echo "result=zone-unreadable" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          zone_id=$(echo "$zone_resp" | jq -r '.result[0].id // empty')
+          if [ -z "$zone_id" ]; then
+            echo "::warning::zone $ZONE not found in this account"
+            echo "result=zone-not-found" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          host=$(echo "$DOMAIN" | sed "s/\.$ZONE\$//")
+          target="$PROJECT.pages.dev"
+          existing=$(curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?name=$DOMAIN" \
+            | jq -r '.result[0] | "\(.type) \(.content)"')
+          if [ -n "$existing" ] && [ "$existing" != "null null" ]; then
+            echo "::notice::DNS record exists: $DOMAIN ($existing)"
+            echo "result=already-exists" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          resp=$(curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" \
+            -d "{\"type\":\"CNAME\",\"name\":\"$host\",\"content\":\"$target\",\"proxied\":true}")
+          success=$(echo "$resp" | jq -r '.success')
+          if [ "$success" = "true" ]; then
+            echo "::notice::CNAME created: $DOMAIN -> $target (proxied)"
+            echo "result=created" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::CNAME create failed (token likely lacks Zone:DNS:Edit):"
+            echo "$resp" | jq '.errors'
+            echo "result=create-failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify HTTPS (up to 5 min for SSL provisioning)
+        run: |
+          url="https://$DOMAIN$VERIFY_PATH"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+            echo "attempt $i: HTTP $code  $url"
+            case "$code" in
+              200|301|302|304)
+                echo "::notice::$url is live (HTTP $code)"
+                exit 0
+                ;;
+            esac
+            sleep 30
+          done
+          echo "::warning::$url did not return success within 5 min"
+          echo "::warning::dns step result: ${{ steps.dns.outputs.result }}"
+          echo "::warning::if dns=create-failed/zone-unreadable: add CNAME manually in CF dashboard:"
+          echo "::warning::  $DOMAIN  CNAME  $PROJECT.pages.dev  (Proxied)"
+          exit 1
