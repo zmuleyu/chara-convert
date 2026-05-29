@@ -84,3 +84,45 @@ def enrich_layered(
             converted.applied_rules.append("ai_filled scenario.scenario_intro")
 
     return converted
+
+
+def build_field_prompt(card: NormalizedCard, field: str) -> str:
+    """Build a completion prompt for a specific field.
+
+    Selects an existing prompt template when available (mes_example,
+    scenario); inlines a minimal f-string prompt for other fields
+    (personality, description, first_message, appearance).
+
+    Args:
+        card: The normalized character card.
+        field: Target field name.
+
+    Returns:
+        A prompt string suitable for LLM completion.
+
+    Raises:
+        ValueError: If field is not recognized.
+    """
+    if field == "mes_example":
+        return load_prompt(
+            "generate_example_dialogue",
+            name=card.name,
+            description=card.description,
+            personality=card.personality,
+            first_mes=card.first_mes,
+        )
+    if field == "scenario":
+        return load_prompt(
+            "generate_scenario_intro",
+            name=card.name,
+            description=card.description,
+            scenario=card.scenario,
+            first_mes=card.first_mes,
+        )
+    # For other fields: inline minimal prompt
+    context = card.description or "unknown"
+    return (
+        f"Generate a {field} for character '{card.name}'. "
+        f"Context: {context}. "
+        f"Reply with the {field} only, no preamble."
+    )
