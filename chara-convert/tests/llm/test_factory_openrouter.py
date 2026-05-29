@@ -23,10 +23,13 @@ def test_mock_still_wins_over_openrouter(monkeypatch):
 
 
 def test_legacy_anthropic_still_works_when_no_or_key(monkeypatch):
+    import pytest
+    # anthropic lives behind the [ai] extra; CI installs the base package
+    # without extras, so skip cleanly when the legacy backend is unreachable.
+    anthropic = pytest.importorskip("anthropic")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("CHARA_CONVERT_AI_MOCK", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
-    import anthropic
     monkeypatch.setattr(anthropic, "Anthropic", lambda **_: object())
     from chara_convert.llm.factory import build_ai_client_or_none
     _, status = build_ai_client_or_none()
