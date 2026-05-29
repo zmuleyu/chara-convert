@@ -128,19 +128,3 @@ def list_platforms_cmd() -> None:
         click.echo(f"{slug:20s}  {spec.name}")
 
 
-@main.command("webui")
-@click.option("--port", "-p", default=7860, help="Port to run Gradio on")
-@click.option("--share", is_flag=True, help="Create a public Gradio share link")
-def webui_cmd(port: int, share: bool) -> None:
-    """Launch the Gradio Web UI."""
-    try:
-        from chara_convert.webui import build_app
-    except ImportError:
-        click.echo(
-            "Web UI dependencies not installed. Run: uv sync --extra web",
-            err=True,
-        )
-        sys.exit(1)
-
-    app = build_app()
-    app.launch(server_port=port, share=share)
