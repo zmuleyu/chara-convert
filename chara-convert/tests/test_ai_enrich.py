@@ -159,3 +159,22 @@ def test_enrich_layered_skips_unrelated_targets() -> None:
     out = enrich_layered(flat, norm, client=client)
     assert out is flat
     assert client.call_log == []
+
+
+# ---- build_field_prompt -------------------------------------------------------
+
+
+def test_build_field_prompt_mes_example_uses_dialogue_template() -> None:
+    card = NormalizedCard(
+        name="Mira",
+        description="A thief in Veridian.",
+        personality="quick, sarcastic",
+        first_mes="Hey there.",
+    )
+    from chara_convert.ai.enrich import build_field_prompt
+    prompt = build_field_prompt(card, "mes_example")
+    # Should contain expected template keywords
+    assert "Mira" in prompt
+    assert "thief in Veridian" in prompt
+    # Should NOT be the inline fallback
+    assert "Generate a mes_example for character" not in prompt
