@@ -1,43 +1,44 @@
 import { useState, useEffect } from 'react';
-import type { TierId } from './tiers';
-import { TIERS } from './tiers';
+import { getOrCreateUserId } from './userId';
 
+// Credit-balance shape (Phase C). Replaces the prior tier/quota shape; the
+// free-quota Worker endpoint /api/billing/quota stays alive for the existing
+// IP-rate limiter but is no longer consumed by the UI.
 export interface BillingState {
-  tier: TierId;
-  aiUsed: number;
-  aiCap: number;
+  balance: number;
+  held: number;
+  loaded: boolean;
+  userId: string | null;
 }
 
+const INITIAL: BillingState = { balance: 0, held: 0, loaded: false, userId: null };
+
 export function useBilling(): BillingState {
-  const [state, setState] = useState<BillingState>({
-    tier: 'free',
-    aiUsed: 0,
-    aiCap: TIERS.free.aiCapPerDay,
-  });
+  const [state, setState] = useState<BillingState>(INITIAL);
 
   useEffect(() => {
+    // SSR-safe: getOrCreateUserId returns a fresh id when localStorage is
+    // unavailable but never writes — only the browser persists. In tests
+    // localStorage is jsdom-backed, so the generated id sticks.
+    const userId = getOrCreateUserId();
+
     const BASE =
       (import.meta.env.PUBLIC_BILLING_BASE as string | undefined) ??
       'http://localhost:8787';
 
-    fetch(`${BASE}/api/billing/quota`, { method: 'GET' })
+    fetch(`${BASE}/api/billing/credit/balance`, {
+      method: 'GET',
+      headers: { 'X-User-Id': userId },
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
-        return res.json();
+        return res.json() as Promise<{ balance: number; held: number }>;
       })
-      .then((data: { tier: TierId; aiUsed: number; aiCap: number }) => {
-        setState({
-          tier: data.tier,
-          aiUsed: data.aiUsed,
-          aiCap: data.aiCap,
-        });
+      .then((data) => {
+        setState({ balance: data.balance, held: data.held, loaded: true, userId });
       })
       .catch(() => {
-        setState({
-          tier: 'free',
-          aiUsed: 0,
-          aiCap: TIERS.free.aiCapPerDay,
-        });
+        setState({ balance: 0, held: 0, loaded: true, userId });
       });
   }, []);
 
