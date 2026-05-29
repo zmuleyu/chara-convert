@@ -94,7 +94,7 @@ export default {
     return new Response('not found', { status: 404 });
   },
 
-  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+  async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
     await refundOpenHoldsOlderThan(env.CREDIT_DB, oneHourAgo);
   },
