@@ -1,6 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+﻿import { defineConfig, devices } from '@playwright/test';
 
-// @ts-ignore — process is a Node.js global
+// @ts-ignore 鈥?process is a Node.js global
 const CI = !!process.env['CI'];
 
 export default defineConfig({
@@ -22,8 +22,8 @@ export default defineConfig({
       reuseExistingServer: !CI,
       stdout: 'pipe',
       stderr: 'pipe',
-      // @ts-ignore — process is a Node.js global
-      env: { PYTHONUNBUFFERED: '1', PATH: process.env['PATH'] || '' },
+      // @ts-ignore 鈥?process is a Node.js global
+      env: { PYTHONUNBUFFERED: '1', PATH: process.env['PATH'] || '', CHARA_CONVERT_AI_MOCK: 'Aerin is calm and quietly observant.' },
     },
     {
       command: 'npm run preview -- --port 4321',
@@ -35,3 +35,4 @@ export default defineConfig({
   ],
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
+
