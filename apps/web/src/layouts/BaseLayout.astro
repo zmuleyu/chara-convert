@@ -1,8 +1,15 @@
 ---
 import '~/styles/globals.css';
-interface Props { title: string }
-const { title } = Astro.props;
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description } = Astro.props;
 const base = import.meta.env.BASE_URL;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const desc =
+  description ??
+  'Convert and edit AI character cards across CAI, Chai, SillyTavern, FictionLab, NovelAI, RisuAI, JanitorAI, Backyard, Agnai, Nomi and PolyBuzz.';
 ---
 <!doctype html>
 <html lang="en">
@@ -10,14 +17,28 @@ const base = import.meta.env.BASE_URL;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>{title} · chara-convert</title>
+    <meta name="description" content={desc} />
+    <link rel="canonical" href={canonical.href} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={`${title} · chara-convert`} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:site_name" content="chara-convert" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={`${title} · chara-convert`} />
+    <meta name="twitter:description" content={desc} />
   </head>
   <body class="min-h-screen bg-white text-slate-900">
     <header class="border-b px-6 py-3 flex gap-6">
-      <a href={base}>chara-convert</a>
+      <a href={base} class="font-semibold">chara-convert</a>
       <a href={`${base}convert`}>Convert</a>
       <a href={`${base}pricing`}>Pricing</a>
       <a href={`${base}docs`}>Docs</a>
     </header>
     <main class="px-6 py-8"><slot /></main>
+    <footer class="border-t px-6 py-4 mt-12 text-sm text-slate-500 flex gap-6">
+      <span>chara-convert · open-source character card workbench</span>
+      <a href="https://github.com/zmuleyu/chara-convert" class="underline">GitHub</a>
+    </footer>
   </body>
 </html>

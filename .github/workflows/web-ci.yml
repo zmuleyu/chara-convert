@@ -72,6 +72,28 @@ jobs:
             apps/web/playwright-report/
           retention-days: 7
 
+  lighthouse:
+    needs: build-and-test
+    if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
+      - name: Lighthouse CI (warn-only)
+        working-directory: apps/web
+        run: npx -y @lhci/cli autorun --config=./lighthouserc.json || true
+
   deploy-pages:
     needs: build-and-test
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'

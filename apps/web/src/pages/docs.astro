@@ -1,10 +1,124 @@
 ---
 import BaseLayout from '~/layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+
+const sources = [
+  { slug: 'character_ai',   name: 'Character.AI',   kind: 'paste', notes: 'Paste the Definition block; we parse Personality, Description, Scenario, and Greeting.' },
+  { slug: 'chai',           name: 'Chai',           kind: 'paste', notes: 'Paste the bot description; sections auto-detect by heading.' },
+  { slug: 'polybuzz',       name: 'PolyBuzz',       kind: 'paste', notes: 'Paste the bot bio; AI assist can expand short bios on request.' },
+  { slug: 'sillytavern_v2', name: 'SillyTavern v2', kind: 'file',  notes: 'Drop the PNG (with embedded JSON) or the bare JSON export.' },
+  { slug: 'risuai',         name: 'RisuAI',         kind: 'file',  notes: 'JSON export from the RisuAI workbench.' },
+  { slug: 'agnai',          name: 'Agnai',          kind: 'file',  notes: 'JSON export or PNG variant.' },
+  { slug: 'novelai',        name: 'NovelAI',        kind: 'file',  notes: 'Lorebook + scenario JSON.' },
+  { slug: 'janitorai',      name: 'JanitorAI',      kind: 'file',  notes: 'Card JSON via the Tavern-compatible export option.' },
+  { slug: 'backyard',       name: 'Backyard AI',    kind: 'file',  notes: 'Tavern-format JSON.' },
+  { slug: 'saucepan',       name: 'Saucepan',       kind: 'file',  notes: 'Card JSON.' },
+];
+
+const targets = [
+  { slug: 'fictionlab', name: 'FictionLab', notes: 'Default target. Layered renderer keeps Description / Personality / Scenario separate.' },
+  { slug: 'risuai',     name: 'RisuAI',     notes: 'Mirror of source schema; minimal transformation.' },
+  { slug: 'agnai',      name: 'Agnai',      notes: 'JSON export ready to import into the Agnai web app.' },
+  { slug: 'novelai',    name: 'NovelAI',    notes: 'Lorebook + scenario shaped to NAI conventions.' },
+  { slug: 'janitorai',  name: 'JanitorAI',  notes: 'Tavern-compatible JSON.' },
+  { slug: 'backyard',   name: 'Backyard AI', notes: 'Tavern-compatible JSON.' },
+  { slug: 'nomi',       name: 'Nomi',       notes: 'Personality + description merge; greeting separate.' },
+  { slug: 'saucepan',   name: 'Saucepan',   notes: 'Tavern-compatible JSON.' },
+  { slug: 'sillytavern_v2', name: 'SillyTavern v2', notes: 'Drop-in JSON; PNG embedding ships October 2026.' },
+];
+
+const fields = [
+  { name: 'name',          purpose: 'Character name.' },
+  { name: 'description',   purpose: 'Physical + biographical anchor.' },
+  { name: 'personality',   purpose: 'Behavioral traits, voice, quirks.' },
+  { name: 'scenario',      purpose: 'Opening setting and stakes.' },
+  { name: 'first_mes',     purpose: 'Opening message the character sends.' },
+  { name: 'mes_example',   purpose: 'Example dialogue lines that pin tone.' },
+  { name: 'appearance',    purpose: 'Visual detail (optional; some platforms separate from description).' },
+];
 ---
-<BaseLayout title="Docs">
-  <h1 class="text-3xl font-bold">Supported platforms</h1>
-  <p class="mt-4 text-slate-600">
-    Full source/target matrix populates from
-    <code>/api/platforms</code> in PR-3.
-  </p>
+<BaseLayout
+  title="Docs"
+  description="Supported source and target platforms, field reference, and FAQ for chara-convert."
+>
+  <h1 class="text-3xl font-bold">Docs</h1>
+  <p class="mt-2 text-slate-600">Source and target platforms, the canonical field set, and answers to the questions everyone asks first.</p>
+
+  <h2 class="mt-10 text-2xl font-semibold">Supported source platforms</h2>
+  <p class="text-sm text-slate-500 mt-1">Don't see yours? <a href="https://github.com/zmuleyu/chara-convert/issues/new" class="underline">Open an issue</a> — adding a parser is ~1 day of work.</p>
+  <div class="mt-4 grid gap-3">
+    {sources.map((s) => (
+      <div class="border rounded p-4">
+        <div class="flex items-baseline gap-3">
+          <h3 class="font-semibold">{s.name}</h3>
+          <span class="text-xs uppercase tracking-wide text-slate-500">{s.kind}</span>
+          <code class="text-xs text-slate-400">{s.slug}</code>
+        </div>
+        <p class="mt-1 text-sm text-slate-600">{s.notes}</p>
+      </div>
+    ))}
+  </div>
+
+  <h2 class="mt-10 text-2xl font-semibold">Supported target platforms</h2>
+  <div class="mt-4 grid gap-3">
+    {targets.map((t) => (
+      <div class="border rounded p-4">
+        <div class="flex items-baseline gap-3">
+          <h3 class="font-semibold">{t.name}</h3>
+          <code class="text-xs text-slate-400">{t.slug}</code>
+        </div>
+        <p class="mt-1 text-sm text-slate-600">{t.notes}</p>
+      </div>
+    ))}
+  </div>
+
+  <h2 class="mt-10 text-2xl font-semibold">Field reference</h2>
+  <table class="mt-4 w-full text-sm border-collapse">
+    <thead>
+      <tr class="text-left border-b">
+        <th class="py-2 pr-4">Field</th>
+        <th class="py-2">Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      {fields.map((f) => (
+        <tr class="border-b">
+          <td class="py-2 pr-4 font-mono text-xs">{f.name}</td>
+          <td class="py-2 text-slate-700">{f.purpose}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <h2 class="mt-10 text-2xl font-semibold">FAQ</h2>
+
+  <details class="mt-4 border rounded p-4">
+    <summary class="font-medium cursor-pointer">Is my card data stored anywhere?</summary>
+    <p class="mt-3 text-sm text-slate-700">No. Free-tier sessions stay in your browser (IndexedDB). The FastAPI shim is stateless — it never persists what you paste or upload. Cloud storage ships only when you upgrade to Creator (October 2026).</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">What does Free include?</summary>
+    <p class="mt-3 text-sm text-slate-700">All parsing, all targets, .md export, and 5 AI Assist calls per day. See <a href={`${base}pricing`} class="underline">pricing</a>.</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">How does the AI assist work?</summary>
+    <p class="mt-3 text-sm text-slate-700">Per-field. Click "AI" on any card with a gap; the panel streams a draft you can Accept or Reject. The model sees your other fields as context, never your prior cards.</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">When will Tavern PNG export work?</summary>
+    <p class="mt-3 text-sm text-slate-700">October 2026, alongside Creem checkout. The button is currently disabled with a "Coming October 2026" tooltip.</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">Can I run this locally?</summary>
+    <p class="mt-3 text-sm text-slate-700">Yes — the entire stack is open source at <a href="https://github.com/zmuleyu/chara-convert" class="underline">github.com/zmuleyu/chara-convert</a>. Clone, <code>pip install -e ./chara-convert</code>, then <code>ccv</code> for the CLI or boot apps/web + apps/api locally.</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">My source platform isn't listed.</summary>
+    <p class="mt-3 text-sm text-slate-700">Drop the file anyway — the generic parser handles most Tavern-compatible JSON. If it fails, open an issue with one anonymized example and we'll add a dedicated parser.</p>
+  </details>
 </BaseLayout>
