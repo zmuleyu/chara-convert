@@ -40,7 +40,8 @@ async function handleCredit(url: URL, req: Request, env: Env): Promise<Response 
       return ok(await hold(env.CREDIT_DB, userId, body.amount));
     } catch (e) {
       if (e instanceof InsufficientCredit) return err(402, 'insufficient_credit', 'balance < amount');
-      throw e;
+      console.error('credit/hold unexpected error:', e);
+      return err(500, 'bad_request', 'internal error');
     }
   }
   if (url.pathname === '/api/billing/credit/debit' && req.method === 'POST') {
@@ -54,7 +55,8 @@ async function handleCredit(url: URL, req: Request, env: Env): Promise<Response 
       const m = (e as Error).message;
       if (m === 'hold_not_found') return err(404, 'hold_not_found', m);
       if (m === 'hold_already_settled') return err(409, 'hold_already_settled', m);
-      throw e;
+      console.error('credit/debit unexpected error:', e);
+      return err(500, 'bad_request', 'internal error');
     }
   }
   if (url.pathname === '/api/billing/credit/refund' && req.method === 'POST') {
@@ -65,7 +67,8 @@ async function handleCredit(url: URL, req: Request, env: Env): Promise<Response 
     } catch (e) {
       const m = (e as Error).message;
       if (m === 'hold_already_settled') return err(409, 'hold_already_settled', m);
-      throw e;
+      console.error('credit/refund unexpected error:', e);
+      return err(500, 'bad_request', 'internal error');
     }
   }
   return null;
@@ -96,6 +99,12 @@ export default {
 
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    await refundOpenHoldsOlderThan(env.CREDIT_DB, oneHourAgo);
+    try {
+      const n = await refundOpenHoldsOlderThan(env.CREDIT_DB, oneHourAgo);
+      console.log(`[cron] refunded ${n} stale holds`);
+    } catch (e) {
+      console.error('[cron] refundOpenHoldsOlderThan failed:', e);
+      throw e;
+    }
   },
 };

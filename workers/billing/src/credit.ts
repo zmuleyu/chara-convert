@@ -121,6 +121,10 @@ export async function refund(
     .bind(holdId)
     .first<{ user_id: string; amount: number; status: string }>();
   if (!h) {
+    // Intentional no-op for orphan-refund cron and idempotent client retries
+    // where the hold no longer exists (e.g. already-settled cleanup race). We
+    // return newBalance=0 because we don't know which user_id was on the hold.
+    // Endpoint callers should treat newBalance from this branch as advisory.
     return { newBalance: 0 };
   }
   if (h.status !== 'open') throw new Error('hold_already_settled');
@@ -166,8 +170,10 @@ export async function refundOpenHoldsOlderThan(
     try {
       await refund(db, row.hold_id);
       n += 1;
-    } catch {
-      // race with concurrent debit — skip; next cron tick re-evaluates
+    } catch (e) {
+      const m = (e as Error).message;
+      if (m === 'hold_already_settled') continue;
+      console.error(`refundOpenHoldsOlderThan: ${row.hold_id} failed:`, e);
     }
   }
   return n;
