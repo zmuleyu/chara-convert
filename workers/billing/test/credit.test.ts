@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 import { applyMigration } from './helpers';
-import { getBalance, hold, InsufficientCredit, debit } from '../src/credit';
+import { getBalance, hold, InsufficientCredit, debit, refund } from '../src/credit';
 
 declare const __MIGRATION_SQL__: string;
 
@@ -139,5 +139,52 @@ describe('debit', () => {
     expect(ledger.results).toContainEqual(
       expect.objectContaining({ reason: 'debit', note: 'over_debit_capped' }),
     );
+  });
+});
+
+describe('refund', () => {
+  it('returns held amount to balance and marks hold refunded', async () => {
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_balance VALUES ('u-8', 400, 150, ?)",
+    ).bind(Date.now()).run();
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_hold VALUES ('h-r-1', 'u-8', 150, 'open', ?, NULL)",
+    ).bind(Date.now()).run();
+
+    const r = await refund(env.CREDIT_DB, 'h-r-1');
+    expect(r.newBalance).toBe(550);
+
+    const bal = await env.CREDIT_DB.prepare(
+      'SELECT balance, held FROM credit_balance WHERE user_id=?',
+    ).bind('u-8').first();
+    expect(bal).toEqual({ balance: 550, held: 0 });
+
+    const hold = await env.CREDIT_DB.prepare(
+      'SELECT status FROM credit_hold WHERE hold_id=?',
+    ).bind('h-r-1').first();
+    expect(hold).toEqual({ status: 'refunded' });
+
+    const ledger = await env.CREDIT_DB.prepare(
+      "SELECT delta, reason FROM credit_ledger WHERE hold_id='h-r-1'",
+    ).first();
+    expect(ledger).toEqual({ delta: 150, reason: 'refund' });
+  });
+
+  it('is idempotent on unknown hold (no-op, returns current balance)', async () => {
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_balance VALUES ('u-9', 90, 0, ?)",
+    ).bind(Date.now()).run();
+    const r = await refund(env.CREDIT_DB, 'h-missing');
+    expect(r.newBalance).toBe(0);
+  });
+
+  it('rejects refund on already-debited hold', async () => {
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_balance VALUES ('u-10', 100, 0, ?)",
+    ).bind(Date.now()).run();
+    await env.CREDIT_DB.prepare(
+      "INSERT INTO credit_hold VALUES ('h-debited', 'u-10', 50, 'debited', ?, ?)",
+    ).bind(Date.now(), Date.now()).run();
+    await expect(refund(env.CREDIT_DB, 'h-debited')).rejects.toThrow(/hold_already_settled/);
   });
 });

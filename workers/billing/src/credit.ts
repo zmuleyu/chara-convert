@@ -1,4 +1,4 @@
-import type { BalanceView, HoldResponse, DebitResponse } from './types';
+import type { BalanceView, HoldResponse, DebitResponse, RefundResponse } from './types';
 
 export async function getBalance(db: D1Database, userId: string): Promise<BalanceView> {
   const row = await db
@@ -109,5 +109,44 @@ export async function debit(
     );
   }
   await db.batch(stmts);
+  return { newBalance };
+}
+
+export async function refund(
+  db: D1Database,
+  holdId: string,
+): Promise<RefundResponse> {
+  const h = await db
+    .prepare('SELECT user_id, amount, status FROM credit_hold WHERE hold_id = ?')
+    .bind(holdId)
+    .first<{ user_id: string; amount: number; status: string }>();
+  if (!h) {
+    return { newBalance: 0 };
+  }
+  if (h.status !== 'open') throw new Error('hold_already_settled');
+
+  const bal = await db
+    .prepare('SELECT balance, held FROM credit_balance WHERE user_id = ?')
+    .bind(h.user_id)
+    .first<{ balance: number; held: number }>();
+  const balance = bal?.balance ?? 0;
+  const held = bal?.held ?? 0;
+  const now = Date.now();
+
+  const newBalance = balance + h.amount;
+  const newHeld = held - h.amount;
+
+  await db.batch([
+    db.prepare(
+      'UPDATE credit_balance SET balance = ?, held = ?, updated_at = ? WHERE user_id = ?',
+    ).bind(newBalance, newHeld, now, h.user_id),
+    db.prepare(
+      "UPDATE credit_hold SET status = 'refunded', settled_at = ? WHERE hold_id = ?",
+    ).bind(now, holdId),
+    db.prepare(
+      "INSERT INTO credit_ledger (ts, user_id, delta, reason, hold_id) VALUES (?, ?, ?, 'refund', ?)",
+    ).bind(now, h.user_id, h.amount, holdId),
+  ]);
+
   return { newBalance };
 }
