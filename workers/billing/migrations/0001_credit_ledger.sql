@@ -1,6 +1,9 @@
 -- 0001_credit_ledger.sql
 -- Schema for credit ledger. Owner: docs/specs/2026-05-29-or-credit-router-design.md
--- Invariant 1: sum(credit_ledger.delta) per user == credit_balance.balance + credit_balance.held
+-- Invariant 1 (external conservation): sum(credit_ledger.delta) per user, restricted to
+--   reason IN ('grant','topup','debit'), == credit_balance.balance + credit_balance.held.
+--   'hold' / 'refund' rows record internal balance<->held transfers and are intentionally
+--   excluded -- they capture audit trail, not money entering/leaving the system.
 -- Invariant 2: every credit_hold row settles to 'debited' or 'refunded'
 -- Invariant 3: credit_balance.balance + credit_balance.held >= 0 always
 
