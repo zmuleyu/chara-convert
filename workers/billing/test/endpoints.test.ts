@@ -111,4 +111,36 @@ describe('credit endpoints', () => {
     expect(r.status).toBe(400);
     expect(await r.json()).toMatchObject({ code: 'bad_request' });
   });
+
+  // Phase C: CORS — apps/web (4321) calls credit/* from the browser, so the
+  // Worker must echo Access-Control-Allow-Origin for the allow-listed origins
+  // and short-circuit OPTIONS preflight.
+  it('OPTIONS preflight returns 204 with CORS headers when Origin is allow-listed', async () => {
+    const r = await SELF.fetch('https://x/api/billing/credit/balance', {
+      method: 'OPTIONS',
+      headers: { origin: 'http://localhost:4321' },
+    });
+    expect(r.status).toBe(204);
+    expect(r.headers.get('access-control-allow-origin')).toBe('http://localhost:4321');
+    expect(r.headers.get('access-control-allow-methods')).toContain('GET');
+    expect(r.headers.get('access-control-allow-headers')).toContain('x-user-id');
+  });
+
+  it('GET balance echoes CORS Allow-Origin for allow-listed origin', async () => {
+    const r = await SELF.fetch('https://x/api/billing/credit/balance', {
+      method: 'GET',
+      headers: { 'x-user-id': 'u-cors', origin: 'http://127.0.0.1:4321' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('access-control-allow-origin')).toBe('http://127.0.0.1:4321');
+  });
+
+  it('omits CORS headers when Origin is not allow-listed', async () => {
+    const r = await SELF.fetch('https://x/api/billing/credit/balance', {
+      method: 'GET',
+      headers: { 'x-user-id': 'u-cors', origin: 'https://attacker.example' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('access-control-allow-origin')).toBeNull();
+  });
 });

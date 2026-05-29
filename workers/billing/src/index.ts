@@ -3,6 +3,40 @@ import type { Env, CreditError } from './types';
 
 export { CreditDO } from './credit-do';
 
+// CORS allow-list — both the Pages preview host and the local Astro dev server.
+// Keep aligned with apps/api/main.py CORSMiddleware so a single browser fetch
+// against /api/billing/credit/* doesn't fail preflight when /api/ai/enrich
+// already works. Add new origins by appending below; we don't echo
+// arbitrary Origin headers — credit endpoints are unauthenticated except for
+// the X-User-Id BYOK header so wildcard CORS would let any page drain a
+// known user's credits.
+const ALLOWED_ORIGINS = new Set([
+  'https://studio.aichathub.uk',
+  'https://chara-convert-web.pages.dev',
+  'http://localhost:4321',
+  'http://127.0.0.1:4321',
+]);
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin');
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) return {};
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, x-user-id',
+    'access-control-max-age': '86400',
+    'vary': 'origin',
+  };
+}
+
+function withCors(res: Response, req: Request): Response {
+  const cors = corsHeaders(req);
+  if (Object.keys(cors).length === 0) return res;
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 const TODO = (todo: string) => new Response(JSON.stringify({ todo }), {
   status: 501, headers: { 'content-type': 'application/json' },
 });
@@ -64,28 +98,39 @@ async function refundStaleHoldsViaDO(env: Env, thresholdMs: number): Promise<num
   return refunded;
 }
 
+async function handle(req: Request, env: Env): Promise<Response> {
+  const url = new URL(req.url);
+  const ip = req.headers.get('cf-connecting-ip') ?? '0.0.0.0';
+
+  // CORS preflight short-circuit — always respond 204; the actual
+  // method/header gating lives in the route handler.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204 });
+  }
+
+  if (url.pathname === '/api/billing/quota' && req.method === 'GET') {
+    return Response.json(await readQuota(env.RATE_LIMIT_KV, ip));
+  }
+  if (url.pathname === '/api/billing/bump' && req.method === 'POST') {
+    const used = await bumpQuota(env.RATE_LIMIT_KV, ip);
+    return Response.json({ aiUsed: used });
+  }
+
+  if (url.pathname.startsWith('/api/billing/credit/')) {
+    const userOrErr = requireUserId(req);
+    if (userOrErr instanceof Response) return userOrErr;
+    return proxyToCreditDO(url, req, env, userOrErr);
+  }
+
+  if (url.pathname === '/api/billing/checkout') return TODO('Creem cutover 2026-10');
+  if (url.pathname === '/api/billing/webhook') return TODO('Creem cutover 2026-10');
+  return new Response('not found', { status: 404 });
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    const url = new URL(req.url);
-    const ip = req.headers.get('cf-connecting-ip') ?? '0.0.0.0';
-
-    if (url.pathname === '/api/billing/quota' && req.method === 'GET') {
-      return Response.json(await readQuota(env.RATE_LIMIT_KV, ip));
-    }
-    if (url.pathname === '/api/billing/bump' && req.method === 'POST') {
-      const used = await bumpQuota(env.RATE_LIMIT_KV, ip);
-      return Response.json({ aiUsed: used });
-    }
-
-    if (url.pathname.startsWith('/api/billing/credit/')) {
-      const userOrErr = requireUserId(req);
-      if (userOrErr instanceof Response) return userOrErr;
-      return proxyToCreditDO(url, req, env, userOrErr);
-    }
-
-    if (url.pathname === '/api/billing/checkout') return TODO('Creem cutover 2026-10');
-    if (url.pathname === '/api/billing/webhook') return TODO('Creem cutover 2026-10');
-    return new Response('not found', { status: 404 });
+    const res = await handle(req, env);
+    return withCors(res, req);
   },
 
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
