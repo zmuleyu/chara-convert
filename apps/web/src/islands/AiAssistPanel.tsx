@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '~/lib/store';
+import { useBilling } from '~/lib/billing/client';
+import UpgradeCTA from './UpgradeCTA';
 
 interface Props { field: string; onClose: () => void }
 
@@ -8,6 +10,8 @@ const BASE = (import.meta.env.PUBLIC_API_BASE as string | undefined) ?? 'http://
 export default function AiAssistPanel({ field, onClose }: Props) {
   const card = useStore((s) => ({ ...(s.sourceCard ?? {}), ...(s.converted ?? {}), ...s.overrides }));
   const setOverride = useStore((s) => s.setOverride);
+  const billing = useBilling();
+  const quotaHit = billing.aiCap >= 0 && billing.aiUsed >= billing.aiCap;
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'streaming' | 'done' | 'error'>('idle');
 
@@ -51,10 +55,11 @@ export default function AiAssistPanel({ field, onClose }: Props) {
       </header>
       <div className="text-xs text-slate-500">Uses other card fields as context.</div>
       <button type="button" onClick={generate}
-        disabled={status === 'streaming'}
+        disabled={status === 'streaming' || quotaHit}
         className="px-3 py-1 bg-slate-900 text-white rounded text-sm disabled:opacity-40">
-        {status === 'streaming' ? 'Streaming…' : status === 'done' ? 'Regenerate' : 'Generate'}
+        {quotaHit ? 'Quota reached' : status === 'streaming' ? 'Streaming…' : status === 'done' ? 'Regenerate' : 'Generate'}
       </button>
+      {quotaHit && <UpgradeCTA />}
       <pre className="whitespace-pre-wrap text-sm border rounded p-2 min-h-32 bg-slate-50">{text}</pre>
       {status === 'error' && <p className="text-sm text-red-600">Stream failed. Try again.</p>}
       <div className="flex gap-2">
