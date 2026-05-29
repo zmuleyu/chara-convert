@@ -18,7 +18,6 @@
 - `uv run ccv convert <card> --target <platform> --out report.md`
 - `uv run ccv diff <card> --target <platform>`
 - `uv run ccv list-platforms`
-- `uv run ccv webui` → http://127.0.0.1:7860
 
 ## Testing And Validation
 - Run the smallest relevant validation command after code changes.
