@@ -11,9 +11,12 @@ model_class ("low" | "high") and the OR fallback chain lives in MODEL_BY_CLASS.
 """
 from __future__ import annotations
 
+import json
 import os
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from typing import Any, Literal
+
+import httpx
 
 from chara_convert.llm.base import LLMClient
 
@@ -75,3 +78,73 @@ class OpenRouterClient(LLMClient):
         if not choices:
             return ""
         return getattr(choices[0].message, "content", "") or ""
+
+    def _ensure_async_http(self) -> Any:
+        existing = getattr(self, "_async_http", None)
+        if existing is not None:
+            return existing
+        self._async_http = httpx.AsyncClient(
+            base_url=DEFAULT_BASE_URL,
+            headers={
+                "Authorization": f"Bearer {os.environ.get('OPENROUTER_API_KEY') or ''}",
+                "content-type": "application/json",
+            },
+            timeout=httpx.Timeout(60.0, connect=10.0),
+        )
+        return self._async_http
+
+    async def stream_chat(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        max_tokens: int = 800,
+        temperature: float = 0.7,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        http = self._ensure_async_http()
+        payload = {
+            "model": self._cfg["primary"],
+            "models": self._cfg["fallback"],
+            "provider": {"sort": "price", "allow_fallbacks": True},
+            "messages": messages,
+            "stream": True,
+            "usage": {"include": True},
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        async with http.stream("POST", "/chat/completions", json=payload) as stream:
+            buf = b""
+            async for chunk in stream.response.aiter_bytes():
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    ev = parse_or_sse_line(line)
+                    if ev is not None:
+                        yield ev
+            if buf:
+                ev = parse_or_sse_line(buf)
+                if ev is not None:
+                    yield ev
+
+
+def parse_or_sse_line(raw: bytes) -> dict[str, Any] | None:
+    """Convert one OR SSE line to our internal event shape, or None for non-data."""
+    if not raw.startswith(b"data:"):
+        return None
+    payload = raw[len(b"data:"):].strip()
+    if not payload:
+        return None
+    if payload == b"[DONE]":
+        return {"type": "done"}
+    try:
+        obj = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    usage = obj.get("usage") or {}
+    if isinstance(usage, dict) and "cost" in usage:
+        return {"type": "usage", "cost_usd": float(usage["cost"])}
+    choices = obj.get("choices") or []
+    if choices:
+        delta = (choices[0].get("delta") or {}).get("content")
+        if delta is not None:
+            return {"type": "content", "delta": delta}
+    return None
