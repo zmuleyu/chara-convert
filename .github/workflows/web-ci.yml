@@ -100,7 +100,7 @@ jobs:
         working-directory: apps/web
         env:
           PUBLIC_API_BASE: ${{ vars.PUBLIC_API_BASE || 'https://chara-convert-shim.fly.dev' }}
-          PUBLIC_BILLING_BASE: ${{ vars.PUBLIC_BILLING_BASE || 'https://chara-convert-billing.workers.dev' }}
+          PUBLIC_BILLING_BASE: ${{ vars.PUBLIC_BILLING_BASE || 'https://chara-convert-billing.zmuleyu.workers.dev' }}
         run: npm run build
       - name: Cloudflare Pages deploy
         uses: cloudflare/pages-action@v1
