@@ -4,4 +4,5 @@ compatibility_date = "2026-05-28"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "TBD-bind-on-first-deploy"
+id = "b240216870df41b5998eb183822757ee"
+preview_id = "251c98eaa1f940f5a416460c0d74650a"

@@ -8,10 +8,10 @@
 ```
 studio.aichathub.uk/chara-convert/*  →  Cloudflare Pages   (apps/web)
 chara-convert-shim.fly.dev/*          →  Fly.io machine    (apps/api)
-chara-convert-billing.workers.dev/*  →  Cloudflare Worker (workers/billing)
+chara-convert-billing.zmuleyu.workers.dev/*  →  Cloudflare Worker (workers/billing)
 ```
 
-Web fetches FastAPI via `PUBLIC_API_BASE` env (`https://chara-convert-shim.fly.dev`) and the billing worker via `PUBLIC_BILLING_BASE` (`https://chara-convert-billing.workers.dev`). Both set as Cloudflare Pages **build env vars**.
+Web fetches FastAPI via `PUBLIC_API_BASE` env (`https://chara-convert-shim.fly.dev`) and the billing worker via `PUBLIC_BILLING_BASE` (`https://chara-convert-billing.zmuleyu.workers.dev`). Both set as Cloudflare Pages **build env vars**.
 
 ---
 
@@ -29,7 +29,7 @@ Then in Cloudflare dashboard:
 - Bind custom domain `studio.aichathub.uk/chara-convert/*` (or add CNAME from existing studio.aichathub.uk zone to `chara-convert-web.pages.dev` if DNS is elsewhere).
 - Set production build env vars:
   - `PUBLIC_API_BASE = https://chara-convert-shim.fly.dev`
-  - `PUBLIC_BILLING_BASE = https://chara-convert-billing.workers.dev`
+  - `PUBLIC_BILLING_BASE = https://chara-convert-billing.zmuleyu.workers.dev`
 - Enable Web Analytics (Settings → Web Analytics → Enable).
 
 ### 2. Fly.io — `chara-convert-shim`
@@ -70,7 +70,7 @@ Repo → Settings → Secrets and variables → Actions:
 
 GitHub repo **vars** (non-secret, for build override):
 - `PUBLIC_API_BASE` — defaults to `https://chara-convert-shim.fly.dev` if unset
-- `PUBLIC_BILLING_BASE` — defaults to `https://chara-convert-billing.workers.dev` if unset
+- `PUBLIC_BILLING_BASE` — defaults to `https://chara-convert-billing.zmuleyu.workers.dev` if unset
 
 `ANTHROPIC_API_KEY` lives only as a **Fly.io secret** — NOT in GitHub. CI tests run with `CHARA_CONVERT_AI_MOCK` mock.
 
@@ -95,7 +95,7 @@ curl -sI https://studio.aichathub.uk/chara-convert/convert | head -1
 curl -sI https://studio.aichathub.uk/chara-convert/pricing | head -1
 curl -s https://chara-convert-shim.fly.dev/healthz
 curl -s https://chara-convert-shim.fly.dev/api/platforms | jq '.sources | length'
-curl -s https://chara-convert-billing.workers.dev/api/billing/quota | jq
+curl -s https://chara-convert-billing.zmuleyu.workers.dev/api/billing/quota | jq
 ```
 
 All five must return HTTP 200 / valid JSON / non-empty body before flipping the launch flag.

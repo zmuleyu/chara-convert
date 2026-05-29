@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production-billing
-      url: https://chara-convert-billing.workers.dev/api/billing/quota
+      url: https://chara-convert-billing.zmuleyu.workers.dev/api/billing/quota
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
