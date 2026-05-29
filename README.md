@@ -13,6 +13,19 @@ Character card converter (web + API).
 
 See per-app READMEs for run instructions.
 
+## LLM backends
+
+The `chara_convert.llm.factory.build_ai_client_or_none()` helper picks an LLM client at runtime from env vars (first match wins):
+
+| Env var | Backend | Extra | Use case |
+|---|---|---|---|
+| `CHARA_CONVERT_AI_MOCK=<canned>` | `MockLLMClient` | (built-in) | tests / smoke / offline |
+| `ANTHROPIC_API_KEY=sk-ant-...` | `AnthropicClient` (Claude) | `pip install 'chara-convert[ai]'` | prod |
+| `DEEPSEEK_API_KEY=ds-...` | `DeepSeekClient` (OpenAI-compat) | `pip install 'chara-convert[deepseek]'` | cheap dev/staging |
+| _(none)_ | heuristic fallback | — | no AI features |
+
+Override the model name via `CHARA_CONVERT_MODEL` and the base URL via `CHARA_CONVERT_API_BASE` (both backends respect them).
+
 ## Production targets
 
 | Component | Target | Status |

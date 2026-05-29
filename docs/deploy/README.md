@@ -38,9 +38,19 @@ Then in Cloudflare dashboard:
 flyctl auth login
 flyctl apps create chara-convert-shim
 # Fly will auto-detect apps/api/fly.toml on first deploy
+
+# Pick ONE LLM backend secret (precedence: Anthropic > DeepSeek; mock test path always wins):
+#   Anthropic (prod-grade):
 flyctl secrets set ANTHROPIC_API_KEY=sk-ant-... -a chara-convert-shim
+#   DeepSeek (cheap dev/staging, ~$0.14/M input tok):
+flyctl secrets set DEEPSEEK_API_KEY=ds-... -a chara-convert-shim
+
 flyctl deploy --config apps/api/fly.toml --remote-only
 ```
+
+Install the matching SDK extra in `apps/api/Dockerfile` (or pyproject) before deploy:
+- Anthropic backend: `pip install 'chara-convert[ai]'`
+- DeepSeek backend: `pip install 'chara-convert[deepseek]'`
 
 After first deploy, CI takes over via `superfly/flyctl-actions/setup-flyctl@master` + `FLY_API_TOKEN` GH secret.
 
@@ -72,7 +82,7 @@ GitHub repo **vars** (non-secret, for build override):
 - `PUBLIC_API_BASE` — defaults to `https://chara-convert-shim.fly.dev` if unset
 - `PUBLIC_BILLING_BASE` — defaults to `https://chara-convert-billing.zmuleyu.workers.dev` if unset
 
-`ANTHROPIC_API_KEY` lives only as a **Fly.io secret** — NOT in GitHub. CI tests run with `CHARA_CONVERT_AI_MOCK` mock.
+`ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` live only as **Fly.io secrets** — NOT in GitHub. CI tests always run with `CHARA_CONVERT_AI_MOCK`. Factory precedence inside the shim: `CHARA_CONVERT_AI_MOCK` > `ANTHROPIC_API_KEY` > `DEEPSEEK_API_KEY` > `none` (heuristic fallback).
 
 ---
 
