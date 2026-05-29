@@ -27,7 +27,9 @@ planReviewNote: model-dispatch kind=plan-review not shipped; user invoked writin
 |---|---|---|---|
 | A | [2026-05-29-or-credit-router-plan-A-worker.md](2026-05-29-or-credit-router-plan-A-worker.md) | none | miniflare D1 vitest + curl smoke |
 | B | [2026-05-29-or-credit-router-plan-B-python.md](2026-05-29-or-credit-router-plan-B-python.md) | A's endpoint contract (mockable) | pytest + respx OR mock + 1 real CI smoke |
-| C | [2026-05-29-or-credit-router-plan-C-rollout.md](2026-05-29-or-credit-router-plan-C-rollout.md) | A + B deployed | staging flip + balance poll smoke |
+| C | [2026-05-29-or-credit-router-plan-C-rollout.md](2026-05-29-or-credit-router-plan-C-rollout.md) (10 tasks after 2026-05-29 amendment) | A + B deployed | astro check + vitest + staging flip + balance poll smoke |
+
+**Phase C amendment 2026-05-29**: original plan only covered `client.ts` rewrite; preview revealed 4 additional consumers of `tier/aiCap/aiUsed` (AiAssistPanel, UpgradeCTA, pricing.astro, docs.astro). Added Tasks 1.5 / 2.5 / 2.6 / 5.5 / 5.6 / 5.7 to cover the widened scope per user decision (pricing → stub / UpgradeCTA → LowCreditCTA / AiAssistPanel → balance gate).
 
 Execute A → B → C strictly in order. B uses a fake Worker (in-process FastAPI mount or respx) so it does not require A deployed.
 

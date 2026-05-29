@@ -25,6 +25,13 @@
 | `apps/web/src/lib/billing/client.ts` | rewrite | poll `/api/billing/credit/balance`, expose `{balance, held, loaded}` |
 | `apps/web/src/lib/billing/__tests__/client.test.ts` | rewrite | mock the new endpoint shape |
 | `apps/web/src/lib/billing/tiers.ts` | annotate | keep file, add `// DORMANT: pure-credit pivot 2026-05-29` header |
+| `apps/web/src/islands/AiAssistPanel.tsx` | modify | replace `aiCap/aiUsed` gate with balance threshold |
+| `apps/web/src/islands/UpgradeCTA.tsx` | rename + rewrite | becomes `LowCreditCTA`: shows when balance < `MIN_BALANCE_TO_TRY` |
+| `apps/web/src/islands/__tests__/AiAssistPanel.test.tsx` | modify | mock new useBilling shape, assert balance-gated button |
+| `apps/web/src/islands/__tests__/UpgradeCTA.test.tsx` | rename + rewrite | new low-credit conditions |
+| `apps/web/src/pages/pricing.astro` | rewrite | stub "Top-up coming soon" placeholder, drop `TIERS` import |
+| `apps/web/src/pages/docs.astro` | edit | FAQ copy: "5 AI calls/day" + "Upgrade to Creator" → credit model |
+| `apps/web/src/lib/billing/constants.ts` | create | `MIN_BALANCE_TO_TRY = 100` shared by hook gate + CTA threshold |
 | `docs/runbooks/openrouter-byok.md` | create | dashboard BYOK config + key rotation |
 | `docs/runbooks/or-credit-router-rollout.md` | create | staging→prod sequence with rollback |
 | `apps/api/fly.toml` | modify | add `LLM_ROUTER_MODE` + `BILLING_WORKER_URL` + `OPENROUTER_API_KEY` secret refs |
@@ -183,6 +190,32 @@ git commit -m "feat(web): useBilling polls /credit/balance with X-User-Id; loade
 
 ---
 
+## Task 1.5: Shared constants module
+
+**Files:**
+- Create: [apps/web/src/lib/billing/constants.ts](../../apps/web/src/lib/billing/constants.ts)
+
+A single source of truth used by both the AiAssistPanel button gate and the LowCreditCTA banner threshold. Keeping it in one file avoids drift.
+
+- [ ] **Step 1: Write file**
+
+```ts
+// Minimum balance (in credits) at which the UI lets the user attempt an AI request.
+// 100 credits == $0.01, comfortably above the ~13-credit minimum low-class request
+// and the ~90-credit hold for typical high-class requests, so the gate fails open
+// before the server returns 402.
+export const MIN_BALANCE_TO_TRY = 100;
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add apps/web/src/lib/billing/constants.ts
+git commit -m "feat(web): MIN_BALANCE_TO_TRY shared between hook gate + CTA"
+```
+
+---
+
 ## Task 2: Annotate `tiers.ts` as dormant
 
 **Files:**
@@ -215,6 +248,325 @@ Expected: no matches (or only inside `__tests__` legacy snapshots — fine to le
 ```bash
 git add apps/web/src/lib/billing/tiers.ts
 git commit -m "docs(web): mark billing/tiers.ts dormant pending subscription re-enable"
+```
+
+---
+
+## Task 2.5: Rewrite UpgradeCTA → LowCreditCTA (TDD)
+
+**Files:**
+- Delete + create: [apps/web/src/islands/UpgradeCTA.tsx](../../apps/web/src/islands/UpgradeCTA.tsx) → [apps/web/src/islands/LowCreditCTA.tsx](../../apps/web/src/islands/LowCreditCTA.tsx)
+- Modify: [apps/web/src/islands/__tests__/UpgradeCTA.test.tsx](../../apps/web/src/islands/__tests__/UpgradeCTA.test.tsx) → rename to `LowCreditCTA.test.tsx` and rewrite
+
+The existing component renders only when `tier === 'free'` AND quota exhausted. New shape: render when `loaded && balance < MIN_BALANCE_TO_TRY`. Copy points at /pricing (which Task 5 also rewrites).
+
+- [ ] **Step 1: Rewrite the test file**
+
+`apps/web/src/islands/__tests__/LowCreditCTA.test.tsx`:
+
+```tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import LowCreditCTA from '../LowCreditCTA';
+import * as billing from '~/lib/billing/client';
+
+describe('LowCreditCTA', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('does not render while balance is unloaded', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 0, held: 0, loaded: false, userId: 'u-1',
+    });
+    const { container } = render(<LowCreditCTA />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders top-up CTA when loaded and balance < MIN_BALANCE_TO_TRY', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 50, held: 0, loaded: true, userId: 'u-1',
+    });
+    render(<LowCreditCTA />);
+    expect(screen.getByText(/Low credit/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /top.?up/i })).toHaveAttribute(
+      'href', expect.stringContaining('/pricing'),
+    );
+  });
+
+  it('does not render when balance is healthy', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 5000, held: 0, loaded: true, userId: 'u-1',
+    });
+    const { container } = render(<LowCreditCTA />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('does not render when no userId (anonymous)', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 0, held: 0, loaded: true, userId: null,
+    });
+    const { container } = render(<LowCreditCTA />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL** (component not renamed yet).
+
+```
+cd apps/web && npx vitest run src/islands/__tests__/LowCreditCTA.test.tsx
+```
+
+- [ ] **Step 3: Create LowCreditCTA.tsx**
+
+```tsx
+import { useBilling } from '~/lib/billing/client';
+import { MIN_BALANCE_TO_TRY } from '~/lib/billing/constants';
+
+export default function LowCreditCTA() {
+  const { balance, loaded, userId } = useBilling();
+
+  if (!loaded || userId === null) return null;
+  if (balance >= MIN_BALANCE_TO_TRY) return null;
+
+  const base = (import.meta.env.BASE_URL as string | undefined) ?? '/chara-convert/';
+
+  return (
+    <div className="bg-amber-100 border border-amber-300 rounded p-4 mt-4">
+      <p className="font-medium">
+        Low credit ({balance} credit left).
+      </p>
+      <a
+        href={`${base}pricing`}
+        className="text-amber-700 underline hover:text-amber-900 mt-2 inline-block"
+      >
+        Top-up your account
+      </a>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Delete old files + rename test**
+
+```bash
+rm apps/web/src/islands/UpgradeCTA.tsx
+rm apps/web/src/islands/__tests__/UpgradeCTA.test.tsx
+```
+
+- [ ] **Step 5: Update import in AiAssistPanel.tsx** (Task 2.6 handles details; for now just s/UpgradeCTA/LowCreditCTA in the import line so the build doesn't break before Task 2.6)
+
+```bash
+# Inside Task 2.6 this gets refined; this step is just to keep the tree typechecking.
+sed -i 's|UpgradeCTA|LowCreditCTA|g' apps/web/src/islands/AiAssistPanel.tsx
+```
+
+- [ ] **Step 6: Run — expect PASS.**
+
+```
+cd apps/web && npx vitest run src/islands/__tests__/LowCreditCTA.test.tsx
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/web/src/islands/LowCreditCTA.tsx apps/web/src/islands/__tests__/LowCreditCTA.test.tsx apps/web/src/islands/AiAssistPanel.tsx
+git rm apps/web/src/islands/UpgradeCTA.tsx apps/web/src/islands/__tests__/UpgradeCTA.test.tsx 2>/dev/null || true
+git commit -m "feat(web): replace UpgradeCTA (tier-based) with LowCreditCTA (balance-based)"
+```
+
+---
+
+## Task 2.6: AiAssistPanel balance gate (TDD)
+
+**Files:**
+- Modify: [apps/web/src/islands/AiAssistPanel.tsx](../../apps/web/src/islands/AiAssistPanel.tsx)
+- Modify: [apps/web/src/islands/__tests__/AiAssistPanel.test.tsx](../../apps/web/src/islands/__tests__/AiAssistPanel.test.tsx)
+
+Replace `quotaHit` derived from `aiCap/aiUsed` with `lowCredit` derived from `balance < MIN_BALANCE_TO_TRY`. Button label "Quota reached" → "Low credit". Add `X-User-Id` header to the enrich fetch.
+
+- [ ] **Step 1: Rewrite test file**
+
+```tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import AiAssistPanel from '../AiAssistPanel';
+import * as billing from '~/lib/billing/client';
+
+vi.mock('~/lib/store', () => ({
+  useStore: (selector: (s: any) => any) =>
+    selector({ sourceCard: { name: 'Aerin' }, converted: {}, overrides: {}, setOverride: vi.fn() }),
+}));
+
+describe('AiAssistPanel', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('renders Generate button enabled when balance >= MIN_BALANCE_TO_TRY', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 5000, held: 0, loaded: true, userId: 'u-1',
+    });
+    render(<AiAssistPanel field="personality" onClose={vi.fn()} />);
+    const btn = screen.getByRole('button', { name: /Generate/i });
+    expect(btn).toBeEnabled();
+  });
+
+  it('disables button and shows "Low credit" when balance < MIN_BALANCE_TO_TRY', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 50, held: 0, loaded: true, userId: 'u-1',
+    });
+    render(<AiAssistPanel field="personality" onClose={vi.fn()} />);
+    const btn = screen.getByRole('button', { name: /Low credit/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it('disables button while balance is unloaded', () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 0, held: 0, loaded: false, userId: 'u-1',
+    });
+    render(<AiAssistPanel field="personality" onClose={vi.fn()} />);
+    // Any button labeled Generate / Loading should be disabled at unloaded state
+    const btn = screen.getByRole('button', { name: /Generate|Loading/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it('sends X-User-Id when generating', async () => {
+    vi.spyOn(billing, 'useBilling').mockReturnValue({
+      balance: 5000, held: 0, loaded: true, userId: 'u-xyz',
+    });
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({ start(c) { c.close(); } }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const { user } = (await import('@testing-library/user-event')).default
+      ? { user: (await import('@testing-library/user-event')).default.setup() }
+      : { user: { click: async (el: any) => el.click() } };
+
+    render(<AiAssistPanel field="personality" onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /Generate/i }));
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/ai/enrich'),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-User-Id': 'u-xyz' }),
+      }),
+    );
+  });
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL.**
+
+- [ ] **Step 3: Rewrite AiAssistPanel.tsx**
+
+```tsx
+import { useState } from 'react';
+import { useStore } from '~/lib/store';
+import { useBilling } from '~/lib/billing/client';
+import { MIN_BALANCE_TO_TRY } from '~/lib/billing/constants';
+import LowCreditCTA from './LowCreditCTA';
+
+interface Props { field: string; onClose: () => void }
+
+const BASE = (import.meta.env.PUBLIC_API_BASE as string | undefined) ?? 'http://localhost:8000';
+
+export default function AiAssistPanel({ field, onClose }: Props) {
+  const card = useStore((s) => ({ ...(s.sourceCard ?? {}), ...(s.converted ?? {}), ...s.overrides }));
+  const setOverride = useStore((s) => s.setOverride);
+  const billing = useBilling();
+  const lowCredit = billing.loaded && billing.balance < MIN_BALANCE_TO_TRY;
+  const buttonDisabled = !billing.loaded || lowCredit;
+  const [text, setText] = useState('');
+  const [status, setStatus] = useState<'idle' | 'streaming' | 'done' | 'error'>('idle');
+
+  async function generate() {
+    if (!billing.userId) {
+      setStatus('error');
+      return;
+    }
+    setText('');
+    setStatus('streaming');
+    try {
+      const res = await fetch(`${BASE}/api/ai/enrich`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': billing.userId,
+        },
+        body: JSON.stringify({ card, field }),
+      });
+      if (!res.ok || !res.body) throw new Error(`${res.status}`);
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const events = buf.split('\n\n');
+        buf = events.pop() ?? '';
+        for (const ev of events) {
+          const m = ev.match(/^data:\s?(.*)$/m);
+          if (m) setText((prev) => prev + m[1]);
+        }
+      }
+      setStatus('done');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  function accept() { setOverride(field, text.trim()); onClose(); }
+
+  const buttonLabel = !billing.loaded
+    ? 'Loading…'
+    : lowCredit
+      ? 'Low credit'
+      : status === 'streaming'
+        ? 'Streaming…'
+        : status === 'done'
+          ? 'Regenerate'
+          : 'Generate';
+
+  return (
+    <aside role="dialog" aria-label={`AI assist for ${field}`}
+      className="fixed right-0 top-0 h-full w-96 bg-white border-l shadow-xl p-4 space-y-3 overflow-y-auto">
+      <header className="flex justify-between items-center">
+        <h3 className="font-medium">AI assist · {field}</h3>
+        <button type="button" onClick={onClose} aria-label="Close" className="text-slate-500">×</button>
+      </header>
+      <div className="text-xs text-slate-500">Uses other card fields as context.</div>
+      <button type="button" onClick={generate}
+        disabled={buttonDisabled || status === 'streaming'}
+        className="px-3 py-1 bg-slate-900 text-white rounded text-sm disabled:opacity-40">
+        {buttonLabel}
+      </button>
+      {lowCredit && <LowCreditCTA />}
+      <pre className="whitespace-pre-wrap text-sm border rounded p-2 min-h-32 bg-slate-50">{text}</pre>
+      {status === 'error' && <p className="text-sm text-red-600">Stream failed. Try again.</p>}
+      <div className="flex gap-2">
+        <button type="button" disabled={!text} onClick={accept}
+          className="px-3 py-1 bg-emerald-600 text-white rounded text-sm disabled:opacity-40">
+          Accept
+        </button>
+        <button type="button" onClick={onClose} className="px-3 py-1 border rounded text-sm">Reject</button>
+      </div>
+    </aside>
+  );
+}
+```
+
+- [ ] **Step 4: Run — expect PASS** (component + LowCreditCTA suites both green).
+
+```
+cd apps/web && npx vitest run src/islands/__tests__/
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/islands/AiAssistPanel.tsx apps/web/src/islands/__tests__/AiAssistPanel.test.tsx
+git commit -m "feat(web): AiAssistPanel balance-gated + X-User-Id on enrich fetch"
 ```
 
 ---
@@ -482,6 +834,141 @@ LLM_ROUTER_MODE = "legacy"  # flip to "or" via `fly secrets set` after rollout s
 git add apps/api/fly.toml
 git commit -m "chore(api): document LLM_ROUTER_MODE + BILLING_WORKER_URL in fly.toml"
 ```
+
+---
+
+## Task 5.5: Rewrite `pricing.astro` as top-up stub
+
+**Files:**
+- Modify: [apps/web/src/pages/pricing.astro](../../apps/web/src/pages/pricing.astro)
+
+Drop the `TIERS` import + 3 tier cards. Replace with a single "Top-up coming soon" placeholder that's truthful while Creem cutover (Oct 2026) is pending. Resist temptation to design credit packs now — the actual price points should land with Creem integration.
+
+- [ ] **Step 1: Replace file contents**
+
+```astro
+---
+import BaseLayout from '~/layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Pricing">
+  <h1 class="text-3xl font-bold">Pricing</h1>
+  <p class="mt-2 text-slate-600">
+    chara-convert runs on a per-request credit model — no monthly tiers.
+  </p>
+
+  <div class="mt-8 border rounded p-6 space-y-3 bg-slate-50">
+    <h2 class="text-xl font-semibold">Credit top-up — coming soon</h2>
+    <p class="text-sm text-slate-700">
+      Self-serve credit purchase ships with the Creem checkout integration in
+      October 2026. In the meantime, contact
+      <a href="https://github.com/zmuleyu/chara-convert/issues/new" class="underline">
+        the team
+      </a>
+      for early access credits.
+    </p>
+    <p class="text-xs text-slate-500">
+      Credits are spent per AI request based on the model that handled it
+      (lower-cost open models when you have less credit, higher-quality models
+      when you have more). 1 credit ≈ $0.0001.
+    </p>
+  </div>
+</BaseLayout>
+```
+
+- [ ] **Step 2: Verify `tiers.ts` no longer imported**
+
+```
+cd apps/web && grep -rn "from.*billing/tiers" src/
+```
+Expected: only the dormant marker in `tiers.ts` itself (no live imports).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/web/src/pages/pricing.astro
+git commit -m "feat(web): pricing page stubbed for credit-model pivot (top-up pending Creem)"
+```
+
+---
+
+## Task 5.6: Update `docs.astro` FAQ copy
+
+**Files:**
+- Modify: [apps/web/src/pages/docs.astro](../../apps/web/src/pages/docs.astro)
+
+Two FAQ entries reference dead concepts ("5 AI calls/day", "Upgrade to Creator $9/mo", "Creator (October 2026)"). Replace with credit-truth.
+
+- [ ] **Step 1: Replace the two stale FAQ entries**
+
+Find:
+```html
+  <details class="mt-4 border rounded p-4">
+    <summary class="font-medium cursor-pointer">Is my card data stored anywhere?</summary>
+    <p class="mt-3 text-sm text-slate-700">No. Free-tier sessions stay in your browser (IndexedDB). The FastAPI shim is stateless — it never persists what you paste or upload. Cloud storage ships only when you upgrade to Creator (October 2026).</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">What does Free include?</summary>
+    <p class="mt-3 text-sm text-slate-700">All parsing, all targets, .md export, and 5 AI Assist calls per day. See <a href={`${base}pricing`} class="underline">pricing</a>.</p>
+  </details>
+```
+
+Replace with:
+```html
+  <details class="mt-4 border rounded p-4">
+    <summary class="font-medium cursor-pointer">Is my card data stored anywhere?</summary>
+    <p class="mt-3 text-sm text-slate-700">No. Sessions stay in your browser (IndexedDB). The FastAPI shim is stateless — it never persists what you paste or upload. Self-serve cloud storage ships alongside the Creem checkout in October 2026.</p>
+  </details>
+
+  <details class="mt-3 border rounded p-4">
+    <summary class="font-medium cursor-pointer">How am I billed for AI assist?</summary>
+    <p class="mt-3 text-sm text-slate-700">Per request, in credits — 1 credit ≈ $0.0001. The router picks the cheapest model class your balance can afford (lower-cost open models if you're tight, higher-quality models when you have more credit). See <a href={`${base}pricing`} class="underline">pricing</a> for top-up status.</p>
+  </details>
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add apps/web/src/pages/docs.astro
+git commit -m "docs(web): replace tier-based FAQ entries with credit-model copy"
+```
+
+---
+
+## Task 5.7: Web TypeScript + test sweep
+
+**Files:** none (verification)
+
+Catches any leftover references to `tier/aiCap/aiUsed` or imports of `UpgradeCTA`.
+
+- [ ] **Step 1: Type check**
+
+```
+cd apps/web && npx astro check
+```
+Expected: 0 errors. If errors reference `tier`, `aiCap`, `aiUsed`, or `UpgradeCTA`, fix the offending file and re-run.
+
+- [ ] **Step 2: Full vitest sweep**
+
+```
+cd apps/web && npm test
+```
+Expected: all green.
+
+- [ ] **Step 3: Manual visual check (dev server)**
+
+```
+cd apps/web && npm run dev
+```
+
+Visit (replace port if not 4321):
+- `http://localhost:4321/chara-convert/` — index renders, no errors
+- `http://localhost:4321/chara-convert/pricing` — top-up stub visible, no $9/$29 cards
+- `http://localhost:4321/chara-convert/docs` — FAQ shows credit copy, no "5 AI calls/day"
+- `http://localhost:4321/chara-convert/convert` — open devtools, run `localStorage.setItem('cc.userId', 'manual-test'); location.reload()`. Click an "AI" field button: Generate button label reflects loaded balance (Loading… → Generate or Low credit depending on staging worker).
+
+- [ ] **Step 4: Commit only if Step 1/2/3 yielded fixes** (no-op commit otherwise; the verification is the artifact)
 
 ---
 
