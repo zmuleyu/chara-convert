@@ -55,3 +55,68 @@ def test_missing_api_key_raises(monkeypatch):
     import pytest
     with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
         OpenRouterClient(api_key=None, model_class="low")
+
+
+import asyncio  # noqa: E402
+
+from chara_convert.llm.openrouter import parse_or_sse_line  # noqa: E402
+
+
+def test_parse_or_sse_line_content_chunk():
+    line = b'data: {"choices":[{"delta":{"content":"hello"}}]}'
+    assert parse_or_sse_line(line) == {"type": "content", "delta": "hello"}
+
+
+def test_parse_or_sse_line_usage_chunk():
+    line = b'data: {"choices":[],"usage":{"total_tokens":100,"cost":0.0042}}'
+    assert parse_or_sse_line(line) == {"type": "usage", "cost_usd": 0.0042}
+
+
+def test_parse_or_sse_line_done_sentinel():
+    assert parse_or_sse_line(b'data: [DONE]') == {"type": "done"}
+
+
+def test_parse_or_sse_line_keepalive_or_blank_returns_none():
+    assert parse_or_sse_line(b'') is None
+    assert parse_or_sse_line(b': ping') is None
+
+
+def test_stream_chat_emits_content_then_usage_then_done():
+    async def run():
+        async def _aiter(self):
+            chunks = [
+                b'data: {"choices":[{"delta":{"content":"hel"}}]}\n',
+                b'data: {"choices":[{"delta":{"content":"lo"}}]}\n',
+                b'data: {"choices":[],"usage":{"cost":0.001}}\n',
+                b'data: [DONE]\n',
+            ]
+            for ch in chunks:
+                yield ch
+
+        class _FakeResponse:
+            def aiter_bytes(self):
+                return _aiter(self)
+
+        class _FakeStream:
+            def __init__(self):
+                self.response = _FakeResponse()
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+
+        class _FakeAsyncClient:
+            def stream(self, *a, **k): return _FakeStream()
+            async def aclose(self): pass
+
+        c = OpenRouterClient(
+            api_key="sk", model_class="low",
+            _client_factory=lambda **_: None,
+        )
+        c._async_http = _FakeAsyncClient()
+
+        events = [e async for e in c.stream_chat(messages=[{"role":"user","content":"hi"}], max_tokens=20)]
+        types = [e["type"] for e in events]
+        assert types == ["content", "content", "usage", "done"]
+        assert events[0]["delta"] + events[1]["delta"] == "hello"
+        assert events[2]["cost_usd"] == 0.001
+
+    asyncio.run(run())
