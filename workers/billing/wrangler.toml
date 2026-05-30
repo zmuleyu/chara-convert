@@ -11,8 +11,8 @@ preview_id = "251c98eaa1f940f5a416460c0d74650a"
 [[d1_databases]]
 binding = "CREDIT_DB"
 database_name = "chara-convert-credit"
-database_id = "REPLACE_AFTER_CREATE"
-preview_database_id = "REPLACE_AFTER_CREATE_PREVIEW"
+database_id = "d2bc8eda-c0e6-46ab-a0ad-b84f57b8a634"
+preview_database_id = "d2bc8eda-c0e6-46ab-a0ad-b84f57b8a634"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
