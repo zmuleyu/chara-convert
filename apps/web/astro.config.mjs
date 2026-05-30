@@ -7,5 +7,6 @@ export default defineConfig({
   base: '/chara-convert/',
   integrations: [react(), tailwind({ applyBaseStyles: false })],
   output: 'static',
+  outDir: './dist/chara-convert',
   build: { inlineStylesheets: 'auto' },
 });
