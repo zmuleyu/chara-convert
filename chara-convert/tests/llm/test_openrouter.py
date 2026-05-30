@@ -93,18 +93,16 @@ def test_stream_chat_emits_content_then_usage_then_done():
             for ch in chunks:
                 yield ch
 
+        # httpx's AsyncClient.stream() async context manager yields a Response
+        # directly — there is no `.response` wrapper. Mock matches that shape.
         class _FakeResponse:
             def aiter_bytes(self):
                 return _aiter(self)
-
-        class _FakeStream:
-            def __init__(self):
-                self.response = _FakeResponse()
             async def __aenter__(self): return self
             async def __aexit__(self, *a): return False
 
         class _FakeAsyncClient:
-            def stream(self, *a, **k): return _FakeStream()
+            def stream(self, *a, **k): return _FakeResponse()
             async def aclose(self): pass
 
         c = OpenRouterClient(

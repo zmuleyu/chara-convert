@@ -113,9 +113,9 @@ class OpenRouterClient(LLMClient):
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-        async with http.stream("POST", "/chat/completions", json=payload) as stream:
+        async with http.stream("POST", "/chat/completions", json=payload) as response:
             buf = b""
-            async for chunk in stream.response.aiter_bytes():
+            async for chunk in response.aiter_bytes():
                 buf += chunk
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
