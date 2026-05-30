@@ -21,7 +21,10 @@ class_name = "CreditDO"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["CreditDO"]
+# new_sqlite_classes required on the free Workers plan (CF API code 10097).
+# CreditDO never touches DO storage — all persistence is in D1 — so the
+# SQLite-backed instance type is a zero-cost switch from new_classes.
+new_sqlite_classes = ["CreditDO"]
 
 [triggers]
 crons = ["*/10 * * * *"]
