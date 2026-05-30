@@ -2,8 +2,12 @@ app = "chara-convert-shim"
 primary_region = "iad"
 
 [build]
-  dockerfile = "Dockerfile"
-  dockerfile_path = "../../"
+  # Build context is repo root (Dockerfile uses repo-root-relative COPY paths:
+  # `COPY chara-convert /chara-convert` and `COPY apps/api /app`). Deploy with:
+  #   cd <repo-root> && fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+  # A `.dockerignore` at repo root excludes node_modules (~660 MB) from the
+  # build context.
+  dockerfile = "apps/api/Dockerfile"
 
 [http_service]
   internal_port = 8000

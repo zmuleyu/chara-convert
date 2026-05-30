@@ -1,0 +1,40 @@
+# Build context lives at repo root for apps/api (see apps/api/fly.toml).
+# Without this file, fly deploy --local-only ships ~660 MB of node_modules
+# through Docker daemon → multi-minute upload + image bloat. The Dockerfile
+# only needs chara-convert/ and apps/api/.
+
+# VCS + tooling
+.git/
+.github/
+.claude/
+.playwright-mcp/
+
+# Build artifacts
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+**/.wrangler/
+**/dist/
+**/build/
+**/.next/
+**/.astro/
+**/.turbo/
+
+# Tests + docs (not needed in image)
+**/test/
+**/tests/
+docs/
+collab/
+
+# Workspaces we don't need in the API image
+apps/web/
+workers/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
