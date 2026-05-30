@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "postbuild": "node -e \"const fs=require('fs');for(const f of ['robots.txt','sitemap.xml'])fs.copyFileSync('dist/chara-convert/'+f,'dist/'+f);\"",
     "preview": "astro preview",
     "typecheck": "astro check && tsc --noEmit",
     "lint": "eslint 'src/**/*.{ts,tsx,astro}'",
