@@ -2,12 +2,15 @@ app = "chara-convert-shim"
 primary_region = "iad"
 
 [build]
-  # Build context is repo root (Dockerfile uses repo-root-relative COPY paths:
-  # `COPY chara-convert /chara-convert` and `COPY apps/api /app`). Deploy with:
-  #   cd <repo-root> && fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
-  # A `.dockerignore` at repo root excludes node_modules (~660 MB) from the
-  # build context.
-  dockerfile = "apps/api/Dockerfile"
+  # `dockerfile` is resolved relative to the directory containing fly.toml
+  # (apps/api/), so "Dockerfile" → apps/api/Dockerfile. The Dockerfile itself
+  # uses repo-root-relative COPY paths (chara-convert/, apps/api/), so deploys
+  # must be invoked from the repo root with the build context set there:
+  #   cd <repo-root> && fly deploy --config apps/api/fly.toml \
+  #                                --dockerfile apps/api/Dockerfile
+  # The `.dockerignore` at repo root excludes node_modules (~660 MB) +
+  # other workspaces from the build context.
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 8000
